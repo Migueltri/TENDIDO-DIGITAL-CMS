@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Download, Monitor, Smartphone, Share2, Globe, CheckCircle2, Apple, Play, Laptop, AlertCircle } from 'lucide-react';
 
