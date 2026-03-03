@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { getSettings, saveSettings, verifyConnection } from '../services/githubService';
+import { getSettings, saveSettings, verifyConnection } from '../Services/githubService';
 import { AppSettings } from '../types';
 import { Save, Code, Copy, CheckCircle, AlertCircle, AlertTriangle, ArrowDown, Edit, Github, Server, Globe } from 'lucide-react';
 
