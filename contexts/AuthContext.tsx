@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Author, SystemRole } from '../types';
-import { getAuthors } from '../services/dataService';
+import { getAuthors } from '../Services/dataService';
 
 interface AuthContextType {
   currentUser: Author | null;
