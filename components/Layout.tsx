@@ -1,9 +1,8 @@
-
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Newspaper, Users, PenTool, ExternalLink, Menu, X, Settings, LogOut, ChevronDown, ShieldCheck, User, Eye, Globe, Download, Smartphone } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { getAuthors } from '../services/dataService';
+import { getAuthors } from '../Services/dataService';
 
 interface LayoutProps {
   children: React.ReactNode;
