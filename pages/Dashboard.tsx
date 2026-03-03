@@ -1,7 +1,6 @@
-
 import React, { useEffect, useState } from 'react';
-import { getArticles, getAuthors } from '../services/dataService';
-import { syncWithGitHub, getSettings, verifyConnection } from '../services/githubService';
+import { getArticles, getAuthors } from '../Services/dataService';
+import { syncWithGitHub, getSettings, verifyConnection } from '../Services/githubService';
 import { Article, Category } from '../types';
 import { Newspaper, Users, MessageSquare, TrendingUp, CloudUpload, RefreshCw, CheckCircle2, Wifi, WifiOff, AlertTriangle, Eye } from 'lucide-react';
 import { Link } from 'react-router-dom';
