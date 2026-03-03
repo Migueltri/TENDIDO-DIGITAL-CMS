@@ -1,8 +1,8 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getArticleById, getAuthors, saveArticle, saveAuthor } from '../services/dataService';
-import { compressImage } from '../services/imageService';
+import { getArticleById, getAuthors, saveArticle, saveAuthor } from '../Services/dataService';
+import { compressImage } from '../Services/imageService';
 import { Article, Author, Category, BullfightResult, GalleryImage } from '../types';
 import { ArrowLeft, Image as ImageIcon, UploadCloud, X, Plus, Bold, Italic, List, Shield, MapPin, Award, Trash2, FileEdit, Send, User, Calendar, Camera, Loader2, MessageSquare, AlertTriangle, Camera as CameraIcon, Link as LinkIcon } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
