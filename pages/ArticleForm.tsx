@@ -183,7 +183,7 @@ const ArticleForm: React.FC = () => {
               if (authorToUpdate) {
                   const newAuthorData = { ...authorToUpdate, imageUrl: compressed };
                   saveAuthor(newAuthorData, true);
-                  import('../services/githubService').then(({ syncWithGitHub }) => syncWithGitHub());
+                  import('../Services/githubService').then(({ syncWithGitHub }) => syncWithGitHub());
               }
           } catch(e) {
               alert("Error al subir foto de autor");
@@ -311,7 +311,7 @@ const ArticleForm: React.FC = () => {
     try {
         if (shouldPublish) {
             saveArticle(articleToSave, true); 
-            const { syncWithGitHub } = await import('../services/githubService');
+            const { syncWithGitHub } = await import('../Services/githubService');
             const result = await syncWithGitHub(true);
             // Limpiar borrador local al guardar éxito
             localStorage.removeItem('td_draft_article');
