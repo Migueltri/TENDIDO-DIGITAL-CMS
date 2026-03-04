@@ -1,0 +1,13 @@
+IMPORTANTE:
+Para que las fotos de los autores se vean correctamente, debes subir los archivos de imagen a esta carpeta (/public/images/) con los siguientes nombres exactos:
+
+1. eduardo.jpg  (Para Eduardo Elvira)
+2. nerea.jpg    (Para Nerea F.Elena)
+3. manolo.jpg   (Para Manolo Herrera)
+4. ruben.jpg    (Para Rubén Sánchez)
+5. iris.jpg     (Para Iris Rodríguez)
+6. antonio.jpg  (Para Antonio Tortosa)
+7. ines.jpg     (Para Inés Sáez)
+8. enrique.jpg  (Para Enrique Salazar)
+
+Si no subes las fotos, aparecerán avatares con las iniciales automáticamente.
