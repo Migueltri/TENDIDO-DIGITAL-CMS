@@ -137,21 +137,53 @@ const Settings: React.FC = () => {
                   </div>
               </div>
               
-              <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                      <svg viewBox="0 0 76 65" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-black">
-                          <path d="M37.5274 0L75.0548 65H0L37.5274 0Z" fill="currentColor"/>
-                      </svg>
-                      <span className="text-sm font-medium text-gray-700">Desplegado en Vercel</span>
+              <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                          <svg viewBox="0 0 76 65" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-black">
+                              <path d="M37.5274 0L75.0548 65H0L37.5274 0Z" fill="currentColor"/>
+                          </svg>
+                          <span className="text-sm font-medium text-gray-700">Desplegado en Vercel</span>
+                      </div>
+                      <a 
+                          href={`https://vercel.com/`} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                      >
+                          Ver Logs en Vercel &rarr;
+                      </a>
                   </div>
-                  <a 
-                      href={`https://vercel.com/`} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline"
-                  >
-                      Ver Logs en Vercel &rarr;
-                  </a>
+                  
+                  {/* BOTÓN DE EMERGENCIA PARA DESCARGAR DB.JSON */}
+                  <div className="mt-2 pt-3 border-t border-gray-200">
+                      <p className="text-xs text-gray-500 mb-2 font-medium">¿Falla la subida automática? Descarga tus noticias y súbelas a GitHub manualmente:</p>
+                      <button 
+                          type="button"
+                          onClick={() => {
+                              import('../services/dataService').then(({ getArticles, getAuthors, getArchivedArticles }) => {
+                                  const data = {
+                                      articles: getArticles(),
+                                      authors: getAuthors(),
+                                      archivedArticles: getArchivedArticles(),
+                                      lastUpdated: new Date().toISOString()
+                                  };
+                                  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                                  const url = URL.createObjectURL(blob);
+                                  const a = document.createElement('a');
+                                  a.href = url;
+                                  a.download = 'db.json';
+                                  document.body.appendChild(a);
+                                  a.click();
+                                  document.body.removeChild(a);
+                                  URL.revokeObjectURL(url);
+                              });
+                          }}
+                          className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm"
+                      >
+                          <ArrowDown size={16} /> Descargar mis noticias (db.json)
+                      </button>
+                  </div>
               </div>
 
               {testStatus && (
