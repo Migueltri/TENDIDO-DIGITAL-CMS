@@ -6,7 +6,7 @@ const urlsToCache = [
 ];
 
 self.addEventListener('install', (event) => {
-  self.skipWaiting(); // Force the waiting service worker to become the active service worker.
+  self.skipWaiting(); // Fuerza la actualización inmediata
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
@@ -16,7 +16,7 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Network First strategy for all requests to ensure the latest version is always fetched
+  // Estrategia Network First: Siempre busca la versión más nueva en internet
   event.respondWith(
     fetch(event.request).catch(() => {
       return caches.match(event.request);
@@ -34,6 +34,6 @@ self.addEventListener('activate', (event) => {
           }
         })
       );
-    }).then(() => self.clients.claim()) // Take control of all clients immediately
+    }).then(() => self.clients.claim()) // Toma el control de la app al instante
   );
 });
