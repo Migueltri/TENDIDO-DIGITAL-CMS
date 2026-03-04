@@ -266,17 +266,36 @@ const Settings: React.FC = () => {
                 </div>
             </div>
 
-            <div className="space-y-1">
-                <label className="block text-sm font-medium text-gray-700">Vercel Deploy Hook URL (Opcional)</label>
+            <div className="space-y-2 p-4 bg-blue-50 border border-blue-100 rounded-lg">
+                <label className="block text-sm font-bold text-blue-900">Vercel Deploy Hook URL (¡MUY IMPORTANTE!)</label>
+                <p className="text-xs text-blue-800 mb-2">
+                    Si la web pública no se actualiza cuando publicas una noticia, necesitas pegar aquí el <strong>Deploy Hook</strong> de Vercel. <br/>
+                    <em>(Ve a Vercel &gt; Tu Proyecto Web &gt; Settings &gt; Git &gt; Deploy Hooks &gt; Create Hook)</em>
+                </p>
                 <input 
                     type="text" 
                     name="vercelDeployHook" 
                     value={settings.vercelDeployHook || ''} 
                     onChange={handleChange} 
-                    className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand-red/20 outline-none bg-white text-gray-800" 
+                    className="w-full p-3 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white text-gray-800" 
                     placeholder="https://api.vercel.com/v1/integrations/deploy/..."
                 />
-                <p className="text-xs text-gray-500 mt-1">Si se configura, se llamará automáticamente a esta URL para forzar el despliegue en Vercel tras subir cambios.</p>
+                {settings.vercelDeployHook && (
+                    <button 
+                        type="button"
+                        onClick={async () => {
+                            try {
+                                await fetch(settings.vercelDeployHook, { method: 'POST' });
+                                alert("✅ Señal enviada a Vercel. La web se actualizará en 1-2 minutos.");
+                            } catch (e) {
+                                alert("❌ Error al enviar la señal a Vercel.");
+                            }
+                        }}
+                        className="mt-2 px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                        Probar actualización de Vercel
+                    </button>
+                )}
             </div>
 
             <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
