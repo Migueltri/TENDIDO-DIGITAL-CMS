@@ -1,10 +1,7 @@
-
 import { AppSettings, Article, Author, ArchivedArticle } from '../types';
 import { getArticles, getAuthors, getArchivedArticles, saveArticlesToLocal, saveAuthorsToLocal, saveArchivedArticlesToLocal } from './dataService';
 
 const SETTINGS_KEY = 'td_app_settings';
-// ... (keep existing code until syncWithGitHub)
-
 
 export const getSettings = (): AppSettings => {
   const stored = localStorage.getItem(SETTINGS_KEY);
@@ -15,7 +12,6 @@ export const getSettings = (): AppSettings => {
       filePath = 'public/data/db.json';
   }
   
-  // Force update if they have the old default settings
   if (
       settings.repoName === 'Tendido-Digital' || 
       settings.repoName === 'tendido-digital-oficial' ||
@@ -24,12 +20,12 @@ export const getSettings = (): AppSettings => {
   ) {
       settings.repoName = 'tendido-digital-cms';
       settings.repoOwner = 'migueltri';
-      settings.githubToken = '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';
+      settings.githubToken = ''; 
       localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
   }
   
   return {
-    githubToken: settings.githubToken || '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',
+    githubToken: settings.githubToken || '',
     repoOwner: settings.repoOwner || 'migueltri',
     repoName: settings.repoName || 'tendido-digital-cms',
     filePath: filePath,
@@ -95,7 +91,6 @@ const fetchRemoteDB = async (settings: AppSettings): Promise<{ sha: string, data
     });
 
     if (response.status === 404) {
-        // Check if the repo exists to distinguish between missing file and missing repo
         const repoUrl = `https://api.github.com/repos/${settings.repoOwner}/${settings.repoName}`;
         const repoRes = await fetch(repoUrl, {
             headers: { 
@@ -106,17 +101,14 @@ const fetchRemoteDB = async (settings: AppSettings): Promise<{ sha: string, data
         if (repoRes.status === 404) {
             throw new Error('Repositorio o usuario no encontrado.');
         }
-        return null; // Repo exists, but file doesn't
+        return null; 
     }
     if (response.status === 401) throw new Error('Token inválido o sin permisos.');
     if (!response.ok) throw new Error(`Error Github (${response.status}): ${response.statusText}`);
 
     const json: GitHubFileResponse = await response.json();
-    
     let rawContent = (json.content || '').replace(/\n/g, '');
     
-    // Si el archivo es mayor a 1MB, la API de contents no devuelve el contenido.
-    // Tenemos que usar la API de Git Blobs usando el SHA.
     if (!rawContent && json.sha && json.size > 0) {
         const blobUrl = `https://api.github.com/repos/${settings.repoOwner}/${settings.repoName}/git/blobs/${json.sha}`;
         const blobRes = await fetch(blobUrl, {
@@ -133,7 +125,6 @@ const fetchRemoteDB = async (settings: AppSettings): Promise<{ sha: string, data
     }
 
     if (!rawContent) {
-        // Archivo vacío o sin contenido
         return {
             sha: json.sha,
             data: { articles: [], authors: [], archivedArticles: [], lastUpdated: '' }
@@ -154,8 +145,6 @@ const fetchRemoteDB = async (settings: AppSettings): Promise<{ sha: string, data
         };
     } catch (e) {
         console.error("Error parsing remote DB:", e);
-        // Si falla el parseo, asumimos corrupto o vacío y devolvemos estructura base para permitir sobreescritura (con cuidado)
-        // O mejor, lanzamos error para no destruir datos.
         throw new Error("El archivo remoto db.json está corrupto o no es JSON válido.");
     }
 };
@@ -170,7 +159,6 @@ export const verifyConnection = async (): Promise<{ success: boolean; message: s
        return { success: false, message: 'Faltan datos de configuración.' };
     }
     try {
-        // First, verify the repository exists and token is valid
         const repoUrl = `https://api.github.com/repos/${owner}/${repo}`;
         const repoRes = await fetch(repoUrl, {
             headers: { 
@@ -192,7 +180,6 @@ export const verifyConnection = async (): Promise<{ success: boolean; message: s
         const repoData = await repoRes.json();
         const defaultBranch = repoData.default_branch || 'main';
 
-        // Update settings with trimmed values and correct branch
         const updatedSettings = {
             ...settings,
             githubToken: token,
@@ -261,12 +248,10 @@ const pushToGitHub = async (settings: AppSettings, data: DatabaseSchema, sha: st
     return true;
 };
 
-// --- SINCRONIZACIÓN MAESTRA (La lógica crítica) ---
 export const syncWithGitHub = async (forcePush: boolean = false): Promise<{ success: boolean; message: string }> => {
     let settings = getSettings();
     if (!settings.githubToken) return { success: false, message: 'Modo Local (Sin configuración de GitHub).' };
 
-    // Trim settings
     settings = {
         ...settings,
         githubToken: (settings.githubToken || '').trim(),
@@ -277,7 +262,6 @@ export const syncWithGitHub = async (forcePush: boolean = false): Promise<{ succ
 
     try {
         await executeWithRetry('syncMaster', async () => {
-            // Ensure we have the correct default branch if we haven't verified it yet
             if (!settings.repoBranch || settings.repoBranch === 'main') {
                 try {
                     const repoUrl = `https://api.github.com/repos/${settings.repoOwner}/${settings.repoName}`;
@@ -307,9 +291,6 @@ export const syncWithGitHub = async (forcePush: boolean = false): Promise<{ succ
             const localArchive = getArchivedArticles();
             const localAuthors = getAuthors();
 
-            let hasChanges = false;
-
-            // --- MERGE INTELLIGENT: AUTHORS ---
             const mergedAuthorsMap = new Map<string, Author>();
             remoteDB.authors.forEach(a => mergedAuthorsMap.set(String(a.id), a));
             
@@ -325,29 +306,21 @@ export const syncWithGitHub = async (forcePush: boolean = false): Promise<{ succ
             });
             remoteDB.authors = Array.from(mergedAuthorsMap.values());
 
-            // --- MERGE INTELLIGENT: ARTICLES ---
             const mergedArticlesMap = new Map<string, Article>();
             if (!remoteDB.articles) remoteDB.articles = [];
             
-            // 1. Start with Remote Articles
             remoteDB.articles.forEach(a => mergedArticlesMap.set(String(a.id), a));
 
-            // 2. Identify Remote Deletions (Zombie Protection)
-            // If an article is in remoteDB.archivedArticles, it means it was deleted by someone else.
-            // We must NOT let our local copy resurrect it.
             const remoteArchivedIds = new Set((remoteDB.archivedArticles || []).map(a => String(a.id)));
 
-            // 3. Merge Local Articles
             localArticles.forEach(lA => {
                 if (remoteArchivedIds.has(String(lA.id))) {
-                    // ZOMBIE CHECK FIX: If it's in remote archive, we only drop it if the remote archive is NEWER than our local modification.
-                    // If our local modification is newer, it means we restored it locally, so we should keep it.
                     const remoteArchivedItem = remoteDB.archivedArticles?.find(a => String(a.id) === String(lA.id));
                     const archivedTime = remoteArchivedItem?.archivedAt ? new Date(remoteArchivedItem.archivedAt).getTime() : 0;
                     const localTime = lA.lastModified ? new Date(lA.lastModified).getTime() : 0;
                     
                     if (localTime <= archivedTime) {
-                        return; // Skip adding this local article, effectively deleting it locally when we save back
+                        return; 
                     }
                 }
 
@@ -355,17 +328,14 @@ export const syncWithGitHub = async (forcePush: boolean = false): Promise<{ succ
                 if (rA) {
                     const localTime = lA.lastModified ? new Date(lA.lastModified).getTime() : 0;
                     const remoteTime = rA.lastModified ? new Date(rA.lastModified).getTime() : 0;
-                    // Last Write Wins
                     if (localTime >= remoteTime) {
                         mergedArticlesMap.set(String(lA.id), lA);
                     }
                 } else {
-                    // New local article (not in remote active, and not in remote archive)
                     mergedArticlesMap.set(String(lA.id), lA);
                 }
             });
             
-            // --- MERGE INTELLIGENT: ARCHIVE ---
             const mergedArchiveMap = new Map<string, ArchivedArticle>();
             if (!remoteDB.archivedArticles) remoteDB.archivedArticles = [];
             remoteDB.archivedArticles.forEach(a => mergedArchiveMap.set(String(a.id), a));
@@ -374,75 +344,51 @@ export const syncWithGitHub = async (forcePush: boolean = false): Promise<{ succ
                 mergedArchiveMap.set(String(lA.id), lA);
             });
 
-            // LIMPIEZA CRUZADA (Consistencia Final)
-            // Si algo está en el mapa de Archivo, NO puede estar en el mapa de Activos.
             mergedArchiveMap.forEach((archivedItem, id) => {
                 if (mergedArticlesMap.has(id)) {
                     const activeItem = mergedArticlesMap.get(id);
-                    
                     const activeTime = activeItem?.lastModified ? new Date(activeItem.lastModified).getTime() : 0;
                     const archivedTime = archivedItem.archivedAt ? new Date(archivedItem.archivedAt).getTime() : 0;
 
-                    // Si la edición activa es POSTERIOR al archivado, significa que se restauró.
                     if (activeTime > archivedTime) {
                         mergedArchiveMap.delete(id); 
                     } else {
-                        // Si el archivado es más reciente (o igual), borramos de activos.
                         mergedArticlesMap.delete(id);
                     }
                 }
             });
 
-            // Check if there are any changes before pushing
             const newArticles = Array.from(mergedArticlesMap.values());
             const newArchivedArticles = Array.from(mergedArchiveMap.values());
             const newAuthors = Array.from(mergedAuthorsMap.values());
 
-            hasChanges = 
-                JSON.stringify(remoteDB.articles) !== JSON.stringify(newArticles) ||
-                JSON.stringify(remoteDB.archivedArticles) !== JSON.stringify(newArchivedArticles) ||
-                JSON.stringify(remoteDB.authors) !== JSON.stringify(newAuthors);
+            const newData: DatabaseSchema = {
+                articles: newArticles,
+                authors: newAuthors,
+                archivedArticles: newArchivedArticles,
+                lastUpdated: new Date().toISOString()
+            };
 
-            remoteDB.articles = newArticles;
-            remoteDB.archivedArticles = newArchivedArticles;
-            remoteDB.authors = newAuthors;
+            await pushToGitHub(settings, newData, sha, 'Sincronización automática CMS');
             
-            // --- CRITICAL: UPDATE LOCAL STORAGE WITH MERGED DATA ---
-            saveArticlesToLocal(remoteDB.articles);
-            saveAuthorsToLocal(remoteDB.authors);
-            saveArchivedArticlesToLocal(remoteDB.archivedArticles);
+            saveArticlesToLocal(newArticles);
+            saveAuthorsToLocal(newAuthors);
+            saveArchivedArticlesToLocal(newArchivedArticles);
 
-            if (hasChanges || !sha) {
-                remoteDB.lastUpdated = new Date().toISOString();
-                
-                // Generar mensaje de commit detallado
-                const publishedArticles = remoteDB.articles.filter(a => a.isPublished);
-                const titles = publishedArticles.map(a => `- ${a.title}`).join('\n');
-                const commitMessage = forcePush 
-                    ? `🚀 Publicación Web: ${publishedArticles.length} noticias activas\n\nNoticias publicadas:\n${titles}`
-                    : '🔄 Sync Automático: Guardado de seguridad';
+        }, 3);
 
-                // Push to GitHub
-                await pushToGitHub(settings, remoteDB, sha, commitMessage);
-                
-                if (settings.vercelDeployHook) {
-                    try {
-                        await fetch(settings.vercelDeployHook, { method: 'POST' });
-                        console.log("Vercel deploy hook triggered.");
-                    } catch (e) {
-                        console.error("Error triggering Vercel deploy hook:", e);
-                    }
-                }
-            } else {
-                console.log("No hay cambios locales para subir. Sincronización completada.");
+        if (settings.vercelDeployHook) {
+            try {
+                await fetch(settings.vercelDeployHook, { method: 'POST' });
+            } catch (e) {
+                console.warn("Failed to trigger Vercel deploy hook", e);
             }
-        });
+        }
 
-        return { success: true, message: '✅ Cambios subidos. Vercel está desplegando la web (tardará 1-2 minutos).' };
+        return { success: true, message: 'Sincronización completada con éxito.' };
 
-    } catch (e: any) {
-        return { success: false, message: `Error Sync: ${e.message}` };
+    } catch (error: any) {
+        console.error("Error en syncWithGitHub:", error);
+        return { success: false, message: `Error al sincronizar: ${error.message}` };
     }
 };
-
-
