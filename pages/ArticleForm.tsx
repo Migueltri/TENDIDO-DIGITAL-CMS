@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { getArticleById, getAuthors, saveArticle, saveAuthor } from '../services/dataService';
 import { compressImage } from '../services/imageService';
 import { Article, Author, Category, BullfightResult, GalleryImage } from '../types';
-import { ArrowLeft, Image as ImageIcon, UploadCloud, X, Plus, Bold, Italic, List, Shield, MapPin, Award, Trash2, FileEdit, Send, User, Calendar, Camera, Loader2, MessageSquare, AlertTriangle, Camera as CameraIcon, Link as LinkIcon } from 'lucide-react';
+import { ArrowLeft, Image as ImageIcon, UploadCloud, X, Plus, Bold, Italic, List, Shield, MapPin, Award, Trash2, FileEdit, Send, Camera, Loader2, MessageSquare, Camera as CameraIcon, Link as LinkIcon, Calendar } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const ArticleForm: React.FC = () => {
@@ -84,27 +84,34 @@ const ArticleForm: React.FC = () => {
         if (savedDraft) {
             try {
                 const draft = JSON.parse(savedDraft);
-                // Preguntar si quiere recuperar
                 if (window.confirm("¡Atención! Hemos encontrado un borrador no guardado de tu última sesión. ¿Quieres recuperarlo?")) {
                     setFormData(draft);
                     if (editorRef.current) editorRef.current.innerHTML = draft.content || '';
                     setDraftRecovered(true);
                 } else {
-                    // Si dice que no, limpiamos
                     localStorage.removeItem('td_draft_article');
                     setFormData(prev => ({ ...prev, id: generateId(), authorId: currentUser?.id || '' }));
                 }
-            } catch (e) { console.error("Error draft", e); }
+            } catch (e) { console.error("Error parseando draft", e); }
         } else {
             setFormData(prev => ({ ...prev, id: generateId(), authorId: currentUser?.id || '' }));
         }
     }
   }, [id, isEditMode, navigate, currentUser, isAdmin]);
 
-  // AUTO-GUARDADO DE BORRADOR DE EMERGENCIA
+  // AUTO-GUARDADO DE BORRADOR DE EMERGENCIA (CORREGIDO PARA EVITAR QUOTAEXCEEDEDERROR)
   useEffect(() => {
       if (!isEditMode && formIsDirty) {
-          localStorage.setItem('td_draft_article', JSON.stringify(formData));
+          // Extraemos las imágenes pesadas antes de guardar en el almacenamiento local
+          const draftToSave = { ...formData };
+          delete draftToSave.imageUrl;
+          delete draftToSave.contentImages;
+          
+          try {
+              localStorage.setItem('td_draft_article', JSON.stringify(draftToSave));
+          } catch (e) {
+              console.warn("No se pudo guardar el borrador por exceso de tamaño", e);
+          }
       }
   }, [formData, isEditMode, formIsDirty]);
 
@@ -133,37 +140,39 @@ const ArticleForm: React.FC = () => {
         setFormData(prev => ({ ...prev, imageUrl: compressedBase64 }));
         setFormIsDirty(true);
       } catch (err) {
-        alert("Error procesando imagen: " + err);
+        alert("Error procesando imagen principal: " + err);
       } finally {
         setLoadingImage(false);
       }
     }
   };
 
+  // CARGA DE GALERÍA (CORREGIDA PARA PROCESAMIENTO SECUENCIAL - EVITA COLAPSO DE RAM)
   const handleGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
       setLoadingImage(true);
-      const promises: Promise<GalleryImage>[] = [];
-
-      Array.from(files).forEach((file) => {
-        promises.push(
-            compressImage(file as File, 1000, 0.8)
-                .then(url => ({ url, caption: '', credit: '' }))
-        );
-      });
+      const newImages: GalleryImage[] = [];
 
       try {
-          const results = await Promise.all(promises);
+          // Procesamos las imágenes una a una, no en paralelo
+          for (let i = 0; i < files.length; i++) {
+              const file = files[i];
+              const compressedUrl = await compressImage(file, 1000, 0.8);
+              newImages.push({ url: compressedUrl, caption: '', credit: '' });
+          }
+
           setFormData(prev => ({
             ...prev,
-            contentImages: [...(prev.contentImages || []), ...results]
+            contentImages: [...(prev.contentImages || []), ...newImages]
           }));
           setFormIsDirty(true);
       } catch (error) {
-          alert("Error subiendo algunas imágenes");
+          alert("Error subiendo algunas imágenes. Es posible que el archivo sea demasiado grande o esté corrupto.");
       } finally {
           setLoadingImage(false);
+          // Limpiar el input para permitir subir la misma imagen si se borra
+          if (galleryInputRef.current) galleryInputRef.current.value = '';
       }
     }
   };
@@ -171,6 +180,7 @@ const ArticleForm: React.FC = () => {
   const handleAuthorImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (file && formData.authorId) {
+          setLoadingImage(true);
           try {
               const compressed = await compressImage(file, 400, 0.8);
               
@@ -183,10 +193,12 @@ const ArticleForm: React.FC = () => {
               if (authorToUpdate) {
                   const newAuthorData = { ...authorToUpdate, imageUrl: compressed };
                   saveAuthor(newAuthorData, true);
-                  import('../services/githubService').then(({ syncWithGitHub }) => syncWithGitHub());
+                  import('../services/githubService').then(({ syncWithGitHub }) => syncWithGitHub(true));
               }
           } catch(e) {
               alert("Error al subir foto de autor");
+          } finally {
+              setLoadingImage(false);
           }
       }
   };
@@ -254,10 +266,7 @@ const ArticleForm: React.FC = () => {
   const handleLink = () => {
     const url = prompt('Introduce el enlace (URL):', 'https://');
     if (url) {
-      // Use execCommand to create the link, which works better across browsers
       document.execCommand('createLink', false, url);
-      
-      // Now find the newly created link and add target="_blank"
       if (editorRef.current) {
         const links = editorRef.current.getElementsByTagName('a');
         for (let i = 0; i < links.length; i++) {
@@ -273,8 +282,7 @@ const ArticleForm: React.FC = () => {
   };
 
   const handleSave = async (e: React.MouseEvent, shouldPublish: boolean) => {
-    // e.preventDefault(); // REMOVED: This might be preventing form submission or button default behavior if needed, but mainly we want to ensure the function runs.
-    if (isSubmitting) return; 
+    if (isSubmitting || loadingImage) return; 
 
     if (!formData.title || !formData.authorId) {
         alert('Por favor completa el Título y el Autor.');
@@ -286,7 +294,6 @@ const ArticleForm: React.FC = () => {
         return;
     }
 
-    // Validación de URL válida (http, https, data:image, o ruta relativa)
     const isValidUrl = (url: string) => {
         try {
             if (url.startsWith('data:image/') || url.startsWith('/')) return true;
@@ -316,10 +323,10 @@ const ArticleForm: React.FC = () => {
       date: formData.date || new Date().toISOString(),
       isPublished: shouldPublish,
       lastModified: new Date().toISOString(),
-      bullfightLocation: formData.bullfightLocation,
-      bullfightCattle: formData.bullfightCattle,
-      bullfightSummary: formData.bullfightSummary,
-      bullfightResults: formData.bullfightResults
+      bullfightLocation: formData.bullfightLocation || '',
+      bullfightCattle: formData.bullfightCattle || '',
+      bullfightSummary: formData.bullfightSummary || '',
+      bullfightResults: formData.bullfightResults || []
     };
 
     setIsSubmitting(true);
@@ -329,7 +336,7 @@ const ArticleForm: React.FC = () => {
             saveArticle(articleToSave, true); 
             const { syncWithGitHub } = await import('../services/githubService');
             const result = await syncWithGitHub(true);
-            // Limpiar borrador local al guardar éxito
+            
             localStorage.removeItem('td_draft_article');
             
             if (result.success) {
@@ -348,7 +355,7 @@ const ArticleForm: React.FC = () => {
     } catch (error: any) {
         setIsSubmitting(false);
         if (error.name === 'QuotaExceededError' || error.message?.includes('quota') || error.message?.includes('exceeded')) {
-            alert("❌ Error: El almacenamiento local está lleno. Por favor, elimina noticias antiguas o reduce el tamaño de las imágenes.");
+            alert("❌ Error: El almacenamiento local está lleno. La imagen es demasiado pesada o hay demasiados datos cacheados.");
         } else {
             alert("❌ Error crítico: " + error.message);
         }
@@ -383,7 +390,7 @@ const ArticleForm: React.FC = () => {
   return (
     <div className="max-w-4xl mx-auto space-y-6 mb-12">
       <div className="flex items-center gap-4">
-        <button onClick={handleCancel} className="text-gray-500 hover:text-gray-800">
+        <button onClick={handleCancel} className="text-gray-500 hover:text-gray-800" disabled={isSubmitting}>
           <ArrowLeft size={24} />
         </button>
         <h2 className="text-2xl font-bold text-gray-800">
@@ -401,7 +408,7 @@ const ArticleForm: React.FC = () => {
         {isSubmitting && (
             <div className="absolute inset-0 bg-white/80 z-50 flex flex-col items-center justify-center rounded-xl backdrop-blur-sm">
                 <Loader2 size={48} className="text-brand-red animate-spin mb-4" />
-                <p className="text-xl font-bold text-gray-800">Publicando noticia...</p>
+                <p className="text-xl font-bold text-gray-800">Procesando petición...</p>
                 <p className="text-sm text-gray-500">Sincronizando con la nube, no cierres la ventana.</p>
             </div>
         )}
@@ -421,7 +428,7 @@ const ArticleForm: React.FC = () => {
           />
         </div>
 
-        {/* --- METADATA ROW 1 --- */}
+        {/* METADATA ROW 1 */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-700">Categoría</label>
@@ -452,7 +459,7 @@ const ArticleForm: React.FC = () => {
             </div>
         </div>
 
-        {/* --- AUTHOR --- */}
+        {/* AUTHOR */}
         <div className="space-y-2">
             <label className="block text-sm font-medium text-gray-700">Autor</label>
             <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
@@ -484,9 +491,9 @@ const ArticleForm: React.FC = () => {
                              <p className="text-xs font-bold text-gray-700">Foto Actual</p>
                              <button 
                                 type="button"
-                                onClick={() => authorImageInputRef.current?.click()}
-                                className="text-xs text-brand-red hover:underline flex items-center gap-1 mt-0.5"
-                                disabled={isSubmitting}
+                                onClick={() => !loadingImage && authorImageInputRef.current?.click()}
+                                className="text-xs text-brand-red hover:underline flex items-center gap-1 mt-0.5 disabled:opacity-50"
+                                disabled={isSubmitting || loadingImage}
                              >
                                  <Camera size={12} /> Cambiar Foto
                              </button>
@@ -496,6 +503,7 @@ const ArticleForm: React.FC = () => {
                                 className="hidden" 
                                 accept="image/*"
                                 onChange={handleAuthorImageUpload}
+                                disabled={isSubmitting || loadingImage}
                              />
                          </div>
                      </div>
@@ -503,7 +511,7 @@ const ArticleForm: React.FC = () => {
             </div>
         </div>
 
-        {/* --- CRONICAS --- */}
+        {/* CRONICAS */}
         {formData.category === Category.CRONICAS && (
             <div className="bg-orange-50 p-6 rounded-xl border border-orange-100 space-y-6">
                 <div className="flex items-center gap-2 text-orange-800 border-b border-orange-200 pb-2">
@@ -523,6 +531,7 @@ const ArticleForm: React.FC = () => {
                             onChange={handleChange}
                             className="w-full p-2 border border-orange-200 rounded focus:border-orange-500 outline-none bg-white"
                             placeholder="Ej: Plaza Mayor de Ciudad Rodrigo"
+                            disabled={isSubmitting}
                         />
                     </div>
                     <div className="space-y-1">
@@ -536,6 +545,7 @@ const ArticleForm: React.FC = () => {
                             onChange={handleChange}
                             className="w-full p-2 border border-orange-200 rounded focus:border-orange-500 outline-none bg-white"
                             placeholder="Ej: Novillos de Talavante"
+                            disabled={isSubmitting}
                         />
                     </div>
                 </div>
@@ -549,6 +559,7 @@ const ArticleForm: React.FC = () => {
                         rows={3}
                         className="w-full p-2 border border-orange-200 rounded focus:border-orange-500 outline-none resize-none bg-white"
                         placeholder="Resumen general del comportamiento del ganado y la tarde..."
+                        disabled={isSubmitting}
                     />
                 </div>
 
@@ -569,6 +580,7 @@ const ArticleForm: React.FC = () => {
                                     type="button" 
                                     onClick={() => removeResult(idx)}
                                     className="text-red-400 hover:text-red-600 p-1 rounded hover:bg-red-50"
+                                    disabled={isSubmitting}
                                 >
                                     <Trash2 size={16} />
                                 </button>
@@ -587,6 +599,7 @@ const ArticleForm: React.FC = () => {
                                 value={newResult.bullfighter}
                                 onChange={(e) => setNewResult(prev => ({ ...prev, bullfighter: e.target.value }))}
                                 onKeyDown={handleResultKeyDown}
+                                disabled={isSubmitting}
                              />
                         </div>
                         <div className="flex-1 w-full space-y-1">
@@ -598,12 +611,14 @@ const ArticleForm: React.FC = () => {
                                 value={newResult.result}
                                 onChange={(e) => setNewResult(prev => ({ ...prev, result: e.target.value }))}
                                 onKeyDown={handleResultKeyDown}
+                                disabled={isSubmitting}
                              />
                         </div>
                         <button 
                             type="button"
                             onClick={addResult}
-                            className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded text-sm font-medium transition-colors w-full md:w-auto h-[38px] flex items-center justify-center gap-1 shadow-sm"
+                            className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded text-sm font-medium transition-colors w-full md:w-auto h-[38px] flex items-center justify-center gap-1 shadow-sm disabled:opacity-50"
+                            disabled={isSubmitting}
                         >
                             <Plus size={16} /> Añadir
                         </button>
@@ -626,7 +641,7 @@ const ArticleForm: React.FC = () => {
           />
         </div>
 
-        {/* --- MAIN IMAGE --- */}
+        {/* MAIN IMAGE */}
         <div className="space-y-3">
           <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">
             <ImageIcon size={18} />
@@ -635,14 +650,7 @@ const ArticleForm: React.FC = () => {
           
           <div 
              className={`border-2 border-dashed ${loadingImage ? 'border-brand-red bg-red-50' : 'border-gray-300 hover:bg-gray-50'} rounded-xl p-6 flex flex-col items-center justify-center text-center transition-colors cursor-pointer relative overflow-hidden`}
-             onClick={() => !loadingImage && mainImageInputRef.current?.click()}
-             onDragOver={(e) => e.preventDefault()}
-             onDrop={(e) => {
-               e.preventDefault();
-               if (!loadingImage && e.dataTransfer.files && e.dataTransfer.files[0]) {
-                  // drop logic would go here
-               }
-             }}
+             onClick={() => !loadingImage && !isSubmitting && mainImageInputRef.current?.click()}
           >
              {loadingImage && (
                  <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/80">
@@ -707,7 +715,7 @@ const ArticleForm: React.FC = () => {
           )}
         </div>
 
-        {/* --- GALLERY IMAGES --- */}
+        {/* GALLERY IMAGES */}
         <div className="space-y-3">
           <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">
              <ImageIcon size={18} />
@@ -716,11 +724,20 @@ const ArticleForm: React.FC = () => {
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div 
-                onClick={() => !loadingImage && galleryInputRef.current?.click()}
-                className="aspect-video border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 hover:border-brand-red/50 hover:text-brand-red transition-all min-h-[200px]"
+                onClick={() => !loadingImage && !isSubmitting && galleryInputRef.current?.click()}
+                className={`aspect-video border-2 border-dashed ${loadingImage ? 'border-brand-red bg-red-50' : 'border-gray-300 hover:bg-gray-50'} rounded-xl flex flex-col items-center justify-center cursor-pointer transition-all min-h-[200px] relative`}
               >
-                  {loadingImage ? <Loader2 className="animate-spin" /> : <Plus size={32} className="mb-2 opacity-50" />}
-                  <span className="text-xs font-medium">{loadingImage ? 'Subiendo...' : 'Añadir Fotos'}</span>
+                  {loadingImage ? (
+                      <div className="flex flex-col items-center justify-center">
+                          <Loader2 size={32} className="animate-spin text-brand-red mb-2" />
+                          <span className="text-xs font-medium text-gray-600">Procesando cola...</span>
+                      </div>
+                  ) : (
+                      <div className="flex flex-col items-center justify-center">
+                          <Plus size={32} className="mb-2 opacity-50 text-gray-500" />
+                          <span className="text-xs font-medium text-gray-600">Añadir Fotos</span>
+                      </div>
+                  )}
                   <input 
                     type="file" 
                     ref={galleryInputRef} 
@@ -740,6 +757,7 @@ const ArticleForm: React.FC = () => {
                             type="button"
                             onClick={() => removeGalleryImage(idx)}
                             className="absolute top-2 right-2 p-1.5 bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700 shadow-md"
+                            disabled={isSubmitting}
                           >
                               <X size={14} />
                           </button>
@@ -775,7 +793,7 @@ const ArticleForm: React.FC = () => {
         <div className="space-y-2">
           <label className="block text-sm font-medium text-gray-700">Contenido de la Noticia</label>
           
-          <div className="border border-gray-200 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-brand-red/20 focus-within:border-brand-red bg-white">
+          <div className={`border rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-brand-red/20 focus-within:border-brand-red bg-white ${isSubmitting ? 'border-gray-200 opacity-70 pointer-events-none' : 'border-gray-200'}`}>
               <div className="flex items-center gap-1 p-2 border-b border-gray-100 bg-gray-50">
                   <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => handleFormat('bold')} className="p-2 hover:bg-gray-200 rounded text-gray-700"><Bold size={18} /></button>
                   <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => handleFormat('italic')} className="p-2 hover:bg-gray-200 rounded text-gray-700"><Italic size={18} /></button>
@@ -786,7 +804,7 @@ const ArticleForm: React.FC = () => {
 
               <div
                   ref={editorRef}
-                  contentEditable
+                  contentEditable={!isSubmitting}
                   suppressContentEditableWarning
                   className="w-full p-4 min-h-[300px] outline-none font-serif text-gray-800 leading-relaxed overflow-y-auto text-lg prose prose-a:text-blue-600 prose-a:underline hover:prose-a:text-blue-800"
                   onInput={(e) => {
@@ -799,14 +817,14 @@ const ArticleForm: React.FC = () => {
           </div>
         </div>
 
-        {/* --- DUAL ACTION BUTTONS (Draft vs Publish) --- */}
+        {/* DUAL ACTION BUTTONS */}
         <div className="pt-6 border-t border-gray-100 flex flex-col sm:flex-row justify-between items-center gap-4">
             
             <button 
                 type="button" 
                 onClick={handleCancel}
-                className="w-full sm:w-auto px-6 py-3 text-gray-600 hover:bg-gray-100 rounded-lg font-medium transition-colors"
-                disabled={isSubmitting}
+                className="w-full sm:w-auto px-6 py-3 text-gray-600 hover:bg-gray-100 rounded-lg font-medium transition-colors disabled:opacity-50"
+                disabled={isSubmitting || loadingImage}
             >
                 Cancelar
             </button>
@@ -815,8 +833,8 @@ const ArticleForm: React.FC = () => {
                 <button 
                     type="button"
                     onClick={(e) => handleSave(e, false)}
-                    className="w-full sm:w-auto px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
-                    disabled={isSubmitting}
+                    className="w-full sm:w-auto px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                    disabled={isSubmitting || loadingImage}
                 >
                     <FileEdit size={18} />
                     Guardar Borrador
@@ -825,7 +843,7 @@ const ArticleForm: React.FC = () => {
                 <button 
                     type="button"
                     onClick={(e) => handleSave(e, true)}
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || loadingImage}
                     className="w-full sm:w-auto px-6 py-3 bg-brand-red hover:bg-red-700 text-white rounded-lg font-bold shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                 >
                     {isSubmitting ? (
