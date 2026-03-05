@@ -52,7 +52,6 @@ const ArticlesList: React.FC = () => {
           syncWithGitHub(true).then(result => {
               if (result.success) {
                   setPendingChanges(0);
-                  // Opcional: Notificación discreta si tienes un sistema de toasts
               } else {
                   alert("⚠️ Se guardó localmente, pero hubo un error subiendo a la web: " + result.message);
                   setPendingChanges(prev => prev + 1);
@@ -165,8 +164,6 @@ const ArticlesList: React.FC = () => {
                   console.warn("Error actualizando la web en segundo plano: " + result.message);
                   setPendingChanges(prev => prev + 1);
               }
-              // Opcional: Recargar datos reales silenciosamente
-              // setArticles(getArticles());
           });
       } catch (error) {
           console.error(error);
@@ -200,11 +197,16 @@ const ArticlesList: React.FC = () => {
 
   const sourceList = viewMode === 'active' ? articles : archivedArticles;
   
+  // ORDENAMIENTO CRONOLÓGICO: Filtramos y luego ordenamos de más reciente a más antigua
   const filteredList = sourceList.filter(article => {
     const matchesCategory = filterCategory === 'all' || article.category === filterCategory;
     const matchesSearch = article.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           (article.summary || '').toLowerCase().includes(searchTerm.toLowerCase());
     return matchesCategory && matchesSearch;
+  }).sort((a, b) => {
+      const dateA = new Date(a.date).getTime();
+      const dateB = new Date(b.date).getTime();
+      return dateB - dateA; // Orden descendente (más reciente primero)
   });
 
   const getAuthor = (id: string) => {
