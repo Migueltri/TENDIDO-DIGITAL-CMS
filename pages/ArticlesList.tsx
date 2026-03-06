@@ -607,7 +607,6 @@ const ArticlesList: React.FC = () => {
             </tbody>
           </table>
         </div>
-      </div>
 
 {/* NUEVO: Botón de Cargar Más */}
       {hasMore && (
