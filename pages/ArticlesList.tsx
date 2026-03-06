@@ -152,33 +152,37 @@ const ArticlesList: React.FC = () => {
     setArticleToDelete({ id, title });
   };
 
-  // ELIMINACIÓN OPTIMISTA: Esto elimina el "lag" al borrar
+// ELIMINACIÓN OPTIMISTA: Esto elimina el "lag" al borrar
   const confirmDelete = () => {
     if (articleToDelete) {
       const idToDelete = articleToDelete.id;
       
       // 1. ACTUALIZACIÓN VISUAL INMEDIATA (Optimista)
       setArticles(prev => prev.filter(article => article.id !== idToDelete));
-      setArticleToDelete(null); // Cerramos el modal al instante
+      setArticleToDelete(null); // Cerramos el modal al instante visualmente
       
-      // 2. Procesamiento en segundo plano
-      try {
-          deleteArticle(idToDelete, currentUser?.id || 'unknown');
-          stopAutoSync(); 
-          
-          syncWithGitHub().then(result => {
-              if (result.success) {
-                  setPendingChanges(0); 
-              } else {
-                  console.warn("Error actualizando la web en segundo plano: " + result.message);
-                  setPendingChanges(prev => prev + 1);
-              }
-          });
-      } catch (error) {
-          console.error(error);
-          alert("Error crítico al eliminar en la base de datos local.");
-          loadData(); // Revertimos vista si falla localmente
-      }
+      // 2. Procesamiento diferido (LA CLAVE PARA QUE NO SE CONGELE)
+      // Le damos 100 milisegundos al navegador para que actualice la pantalla 
+      // y quite el modal antes de bloquear la RAM comprimiendo datos.
+      setTimeout(() => {
+          try {
+              deleteArticle(idToDelete, currentUser?.id || 'unknown');
+              stopAutoSync(); 
+              
+              syncWithGitHub().then(result => {
+                  if (result.success) {
+                      setPendingChanges(0); 
+                  } else {
+                      console.warn("Error actualizando la web en segundo plano: " + result.message);
+                      setPendingChanges(prev => prev + 1);
+                  }
+              });
+          } catch (error) {
+              console.error(error);
+              alert("Error crítico al eliminar en la base de datos local.");
+              loadData(); // Revertimos vista si falla localmente
+          }
+      }, 100); 
     }
   };
 
