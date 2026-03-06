@@ -131,10 +131,13 @@ const ArticleForm: React.FC = () => {
       }
   };
 
-  const handleMainImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+const handleMainImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setLoadingImage(true);
+      // CRÍTICO: Esperar 100ms asegura que React pinte el "Cargando..." en pantalla antes de procesar
+      await new Promise(resolve => setTimeout(resolve, 100));
+
       try {
         const compressedBase64 = await compressImage(file, 1200, 0.85);
         setFormData(prev => ({ ...prev, imageUrl: compressedBase64 }));
@@ -147,19 +150,25 @@ const ArticleForm: React.FC = () => {
     }
   };
 
-  // CARGA DE GALERÍA (CORREGIDA PARA PROCESAMIENTO SECUENCIAL - EVITA COLAPSO DE RAM)
   const handleGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
       setLoadingImage(true);
+      // CRÍTICO: Dar tiempo a la interfaz a mostrar que está trabajando
+      await new Promise(resolve => setTimeout(resolve, 100));
+
       const newImages: GalleryImage[] = [];
 
       try {
-          // Procesamos las imágenes una a una, no en paralelo
+          // Procesamos las imágenes una a una
           for (let i = 0; i < files.length; i++) {
               const file = files[i];
               const compressedUrl = await compressImage(file, 1000, 0.8);
               newImages.push({ url: compressedUrl, caption: '', credit: '' });
+              
+              // CRÍTICO: Dejar "respirar" al procesador del móvil 100ms entre foto y foto
+              // Esto reinicia el contador de "Página no responde" del navegador
+              await new Promise(resolve => setTimeout(resolve, 100));
           }
 
           setFormData(prev => ({
@@ -171,7 +180,7 @@ const ArticleForm: React.FC = () => {
           alert("Error subiendo algunas imágenes. Es posible que el archivo sea demasiado grande o esté corrupto.");
       } finally {
           setLoadingImage(false);
-          // Limpiar el input para permitir subir la misma imagen si se borra
+          // Limpiar el input
           if (galleryInputRef.current) galleryInputRef.current.value = '';
       }
     }
