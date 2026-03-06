@@ -1,7 +1,6 @@
 import LZString from 'lz-string';
 import { Article, ArchivedArticle, Author, Category } from '../types';
 
-// DATOS INICIALES DE AUTORES CON NUEVAS IMÁGENES
 const INITIAL_AUTHORS: Author[] = [
   { id: '1', name: 'Eduardo Elvira', role: 'Director', imageUrl: '/images/eduardo.jpg', systemRole: 'ADMIN' },
   { id: '2', name: 'Nerea F.Elena', role: 'Redacción', imageUrl: '/images/nerea.jpg', systemRole: 'EDITOR' },
@@ -54,264 +53,164 @@ export const INITIAL_ARTICLES: Article[] = [
   },
 ];
 
-const STORAGE_KEYS = {
-  ARTICLES: 'td_articles_v4',
-  AUTHORS: 'td_authors_v10', 
-  ARCHIVE: 'td_archive_v4', 
-};
-
-// --- NUEVO: SISTEMA DE CACHÉ EN MEMORIA (RAM) ---
-// La clave del rendimiento: Almacena los datos en variables rápidas
-// y evita bloqueos del hilo principal al cambiar de página.
+// CACHÉ EN MEMORIA (Velocidad instantánea para la UI)
 let memoryCache = {
-    articles: null as Article[] | null,
-    archive: null as ArchivedArticle[] | null,
-    authors: null as Author[] | null
+    articles: INITIAL_ARTICLES as Article[],
+    archive: [] as ArchivedArticle[],
+    authors: INITIAL_AUTHORS as Author[]
 };
 
-// --- SISTEMA DE AUTO-GUARDADO (AUTO-SYNC) ---
+export let isDataReady = false;
+let dataReadyListeners: (() => void)[] = [];
+
+export const subscribeToData = (cb: () => void) => {
+    if (isDataReady) cb();
+    dataReadyListeners.push(cb);
+    return () => { dataReadyListeners = dataReadyListeners.filter(l => l !== cb); };
+};
+
+const notifyListeners = () => dataReadyListeners.forEach(cb => cb());
+
+// --- NÚCLEO DE RENDIMIENTO: INDEXEDDB EN SEGUNDO PLANO ---
+const DB_NAME = 'TendidoDigitalDB';
+const STORE_NAME = 'cms_store';
+
+const initDB = (): Promise<IDBDatabase> => {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, 1);
+        request.onupgradeneeded = (e) => {
+            const db = (e.target as IDBOpenDBRequest).result;
+            if (!db.objectStoreNames.contains(STORE_NAME)) {
+                db.createObjectStore(STORE_NAME);
+            }
+        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+    });
+};
+
+const setIDB = async (key: string, val: any) => {
+    try {
+        const db = await initDB();
+        return new Promise<void>((resolve, reject) => {
+            const tx = db.transaction(STORE_NAME, 'readwrite');
+            tx.objectStore(STORE_NAME).put(val, key);
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+    } catch(e) { console.error(e); }
+};
+
+const getIDB = async (key: string): Promise<any> => {
+    try {
+        const db = await initDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(STORE_NAME, 'readonly');
+            const req = tx.objectStore(STORE_NAME).get(key);
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+        });
+    } catch(e) { return null; }
+};
+
+// MIGRACIÓN AUTOMÁTICA: Salva los datos del formato lento antiguo al nuevo
+const migrateFromLocalStorage = async () => {
+    if (localStorage.getItem('td_migrated_to_idb_v2')) return;
+    try {
+        const migrateKey = async (lsKey: string, idbKey: string) => {
+            const stored = localStorage.getItem(lsKey);
+            if (stored) {
+                try {
+                    const decompressed = LZString.decompressFromUTF16(stored) || stored;
+                    const parsed = JSON.parse(decompressed);
+                    await setIDB(idbKey, parsed);
+                } catch (e) {}
+            }
+        };
+        await migrateKey('td_articles_v4', 'articles');
+        await migrateKey('td_authors_v10', 'authors');
+        await migrateKey('td_archive_v4', 'archive');
+        localStorage.setItem('td_migrated_to_idb_v2', 'true');
+    } catch (e) { console.error("Fallo de migración", e); }
+};
+
+const initializeData = async () => {
+    await migrateFromLocalStorage();
+    const [savedArticles, savedArchive, savedAuthors] = await Promise.all([
+        getIDB('articles'), getIDB('archive'), getIDB('authors')
+    ]);
+    
+    if (savedArticles) memoryCache.articles = savedArticles;
+    if (savedArchive) memoryCache.archive = savedArchive;
+    if (savedAuthors) memoryCache.authors = savedAuthors;
+
+    isDataReady = true;
+    notifyListeners();
+};
+
+initializeData();
+
+// --- AUTO-SYNC ---
 let autoSaveTimer: any = null;
 let syncCallback: (() => Promise<void>) | null = null;
-
-export const setSyncCallback = (callback: () => Promise<void>) => {
-    syncCallback = callback;
-};
-
-export const stopAutoSync = () => {
-    if (autoSaveTimer) {
-        clearTimeout(autoSaveTimer);
-        autoSaveTimer = null;
-    }
-};
-
+export const setSyncCallback = (callback: () => Promise<void>) => { syncCallback = callback; };
+export const stopAutoSync = () => { if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null; } };
 export const triggerCloudSync = () => {
   if (autoSaveTimer) clearTimeout(autoSaveTimer);
-
   autoSaveTimer = setTimeout(async () => {
-    try {
-      if (syncCallback) {
-          console.log("☁️ Auto-sync iniciado...");
-          await syncCallback();
-      }
-    } catch (error) {
-      console.error("❌ Error Auto-sync:", error);
-    }
+    try { if (syncCallback) await syncCallback(); } catch (error) { console.error(error); }
   }, 2000);
 };
 
-export const getAuthors = (): Author[] => {
-  if (memoryCache.authors) return memoryCache.authors; // Lee la RAM al instante
+// --- OPERACIONES INSTANTÁNEAS (0ms Bloqueo) ---
+export const getAuthors = (): Author[] => memoryCache.authors;
+export const getArticles = (): Article[] => memoryCache.articles;
+export const getArchivedArticles = (): ArchivedArticle[] => memoryCache.archive;
+export const getArticleById = (id: string): Article | undefined => memoryCache.articles.find((a) => String(a.id) === String(id));
 
-  const stored = localStorage.getItem(STORAGE_KEYS.AUTHORS);
-  if (!stored) {
-    const initialJson = JSON.stringify(INITIAL_AUTHORS);
-    localStorage.setItem(STORAGE_KEYS.AUTHORS, LZString.compressToUTF16(initialJson));
-    memoryCache.authors = INITIAL_AUTHORS;
-    return INITIAL_AUTHORS;
-  }
-  
-  let parsed;
-  try {
-      const decompressed = LZString.decompressFromUTF16(stored);
-      if (decompressed) {
-          parsed = JSON.parse(decompressed);
-      } else {
-          parsed = JSON.parse(stored);
-      }
-  } catch (e) {
-      parsed = JSON.parse(stored);
-  }
-  
-  if (Array.isArray(parsed) && parsed.length === 0) {
-      const initialJson = JSON.stringify(INITIAL_AUTHORS);
-      localStorage.setItem(STORAGE_KEYS.AUTHORS, LZString.compressToUTF16(initialJson));
-      memoryCache.authors = INITIAL_AUTHORS;
-      return INITIAL_AUTHORS;
-  }
-  
-  memoryCache.authors = parsed;
-  return parsed;
+export const saveAuthorsToLocal = (authors: Author[]): void => {
+    memoryCache.authors = authors;
+    setIDB('authors', authors);
+};
+
+export const saveArticlesToLocal = (articles: Article[]): void => {
+    memoryCache.articles = articles;
+    setIDB('articles', articles); 
+};
+
+export const saveArchivedArticlesToLocal = (archived: ArchivedArticle[]): void => {
+    memoryCache.archive = archived; 
+    setIDB('archive', archived);
 };
 
 export const saveAuthor = (author: Author, skipSync = false): void => {
-  const authors = getAuthors();
+  const authors = [...getAuthors()];
   const existingIndex = authors.findIndex((a) => String(a.id) === String(author.id));
-  
   const authorToSave = { ...author, lastModified: new Date().toISOString() };
-
-  if (existingIndex >= 0) {
-    authors[existingIndex] = authorToSave;
-  } else {
-    authors.push(authorToSave);
-  }
-  saveAuthorsToLocal(authors);
+  if (existingIndex >= 0) authors[existingIndex] = authorToSave;
+  else authors.push(authorToSave);
   
+  saveAuthorsToLocal(authors);
+  notifyListeners();
   if (!skipSync) triggerCloudSync();
-};
-
-export const saveAuthorsToLocal = (authors: Author[]): void => {
-    memoryCache.authors = authors; // Actualiza la caché
-    try {
-        const json = JSON.stringify(authors);
-        const compressed = LZString.compressToUTF16(json);
-        localStorage.setItem(STORAGE_KEYS.AUTHORS, compressed);
-    } catch (e: any) {
-        if (e.name === 'QuotaExceededError' || e.message?.includes('quota') || e.message?.includes('exceeded')) {
-            console.error("Quota exceeded when saving authors.");
-            throw new Error("QuotaExceededError");
-        } else {
-            throw e;
-        }
-    }
 };
 
 export const deleteAuthor = (id: string): void => {
   const authors = getAuthors().filter((a) => String(a.id) !== String(id));
   saveAuthorsToLocal(authors);
+  notifyListeners();
   triggerCloudSync();
 };
 
-export const getArticles = (): Article[] => {
-  if (memoryCache.articles) return memoryCache.articles; // Lectura instantánea
-
-  const stored = localStorage.getItem(STORAGE_KEYS.ARTICLES);
-  if (!stored) {
-    const initialJson = JSON.stringify(INITIAL_ARTICLES);
-    localStorage.setItem(STORAGE_KEYS.ARTICLES, LZString.compressToUTF16(initialJson));
-    memoryCache.articles = INITIAL_ARTICLES;
-    return INITIAL_ARTICLES;
-  }
-  
-  let articles;
-  try {
-      const decompressed = LZString.decompressFromUTF16(stored);
-      if (decompressed) {
-          articles = JSON.parse(decompressed);
-      } else {
-          articles = JSON.parse(stored);
-      }
-  } catch (e) {
-      articles = JSON.parse(stored);
-  }
-  
-  const updatedArticles = articles.map((a: any) => {
-      if (a.contentImages && a.contentImages.length > 0 && typeof a.contentImages[0] === 'string') {
-          a.contentImages = a.contentImages.map((img: string) => ({ url: img, caption: '' }));
-      }
-      return a;
-  });
-  
-  memoryCache.articles = updatedArticles;
-  return updatedArticles;
-};
-
-export const saveArticlesToLocal = (articles: Article[]): void => {
-    memoryCache.articles = articles; // Actualiza la caché en tiempo real
-    let currentArticles = [...articles];
-    let saved = false;
-    
-    while (!saved && currentArticles.length > 0) {
-        try {
-            const json = JSON.stringify(currentArticles);
-            const compressed = LZString.compressToUTF16(json);
-            localStorage.setItem(STORAGE_KEYS.ARTICLES, compressed);
-            saved = true;
-        } catch (e: any) {
-            if (e.name === 'QuotaExceededError' || e.message?.includes('quota') || e.message?.includes('exceeded')) {
-                const publishedArticles = currentArticles.filter(a => a.isPublished);
-                if (publishedArticles.length > 1) {
-                    publishedArticles.sort((a, b) => new Date(a.lastModified || a.date).getTime() - new Date(b.lastModified || b.date).getTime());
-                    const oldestId = publishedArticles[0].id;
-                    currentArticles = currentArticles.filter(a => a.id !== oldestId);
-                } else {
-                    console.error("Quota exceeded and no safe articles left to drop.");
-                    throw new Error("QuotaExceededError");
-                }
-            } else {
-                console.error("Error saving active articles:", e);
-                throw e;
-            }
-        }
-    }
-    
-    if (currentArticles.length < articles.length) {
-        console.warn(`Dropped ${articles.length - currentArticles.length} articles from local storage due to quota.`);
-        memoryCache.articles = currentArticles; 
-    }
-};
-
-export const getArchivedArticles = (): ArchivedArticle[] => {
-    if (memoryCache.archive) return memoryCache.archive; 
-
-    const stored = localStorage.getItem(STORAGE_KEYS.ARCHIVE);
-    if (!stored) {
-        memoryCache.archive = [];
-        return [];
-    }
-    
-    try {
-        const decompressed = LZString.decompressFromUTF16(stored);
-        if (decompressed) {
-            const parsed = JSON.parse(decompressed);
-            memoryCache.archive = parsed;
-            return parsed;
-        } else {
-            const parsed = JSON.parse(stored);
-            memoryCache.archive = parsed;
-            return parsed;
-        }
-    } catch (e) {
-        const parsed = JSON.parse(stored);
-        memoryCache.archive = parsed;
-        return parsed;
-    }
-};
-
-export const saveArchivedArticlesToLocal = (archived: ArchivedArticle[]): void => {
-    memoryCache.archive = archived; 
-    let currentArchive = [...archived];
-    let saved = false;
-    while (!saved && currentArchive.length > 0) {
-        try {
-            const json = JSON.stringify(currentArchive);
-            const compressed = LZString.compressToUTF16(json);
-            localStorage.setItem(STORAGE_KEYS.ARCHIVE, compressed);
-            saved = true;
-        } catch (e: any) {
-            if (e.name === 'QuotaExceededError' || e.message?.includes('quota') || e.message?.includes('exceeded')) {
-                if (currentArchive.length > 1) {
-                    currentArchive.pop();
-                } else {
-                    console.error("Quota exceeded and no archived articles left to drop.");
-                    throw new Error("QuotaExceededError");
-                }
-            } else {
-                console.error("Error saving archive:", e);
-                throw e;
-            }
-        }
-    }
-    
-    if (currentArchive.length < archived.length) {
-        console.warn(`Dropped ${archived.length - currentArchive.length} archived articles from local storage due to quota.`);
-        memoryCache.archive = currentArchive; 
-    }
-};
-
 export const saveArticle = (article: Article, skipSync = false): void => {
-  const articles = getArticles();
+  const articles = [...getArticles()];
   const existingIndex = articles.findIndex((a) => String(a.id) === String(article.id));
-  
   const articleToSave = { ...article, lastModified: new Date().toISOString() };
-  
-  if (existingIndex >= 0) {
-    articles[existingIndex] = articleToSave;
-  } else {
-    articles.unshift(articleToSave); 
-  }
+  if (existingIndex >= 0) articles[existingIndex] = articleToSave;
+  else articles.unshift(articleToSave); 
   
   saveArticlesToLocal(articles);
-  
+  notifyListeners(); 
   if (!skipSync) triggerCloudSync();
 };
 
@@ -320,25 +219,17 @@ export const deleteArticle = (id: string, userId: string = 'system'): void => {
   const articleToArchive = articles.find((a) => String(a.id) === String(id));
   
   if (articleToArchive) {
-      const archived: ArchivedArticle = {
-          ...articleToArchive,
-          archivedAt: new Date().toISOString(),
-          archivedBy: userId
-      };
-
-      const archive = getArchivedArticles();
+      const archived: ArchivedArticle = { ...articleToArchive, archivedAt: new Date().toISOString(), archivedBy: userId };
+      const archive = [...getArchivedArticles()];
       const existingArchiveIndex = archive.findIndex(a => String(a.id) === String(id));
-      if (existingArchiveIndex >= 0) {
-          archive[existingArchiveIndex] = archived;
-      } else {
-          archive.unshift(archived);
-      }
+      if (existingArchiveIndex >= 0) archive[existingArchiveIndex] = archived;
+      else archive.unshift(archived);
       
       saveArchivedArticlesToLocal(archive);
-
       const newArticles = articles.filter((a) => String(a.id) !== String(id));
       saveArticlesToLocal(newArticles);
       
+      notifyListeners();
       triggerCloudSync();
   }
 };
@@ -349,36 +240,23 @@ export const restoreArticle = (id: string, skipSync = false): boolean => {
 
     if (articleToRestore) {
         const activeArticle: Article = {
-            id: String(articleToRestore.id), 
-            title: articleToRestore.title,
-            summary: articleToRestore.summary,
-            content: articleToRestore.content,
-            imageUrl: articleToRestore.imageUrl,
-            imageCaption: articleToRestore.imageCaption || '', 
-            photoCredit: articleToRestore.photoCredit || '',   
-            contentImages: articleToRestore.contentImages || [],
-            category: articleToRestore.category,
-            authorId: String(articleToRestore.authorId), 
-            date: articleToRestore.date,
-            isPublished: false, 
-            
-            bullfightLocation: articleToRestore.bullfightLocation || '',
-            bullfightCattle: articleToRestore.bullfightCattle || '',
-            bullfightSummary: articleToRestore.bullfightSummary || '',
-            bullfightResults: articleToRestore.bullfightResults || []
+            id: String(articleToRestore.id), title: articleToRestore.title, summary: articleToRestore.summary,
+            content: articleToRestore.content, imageUrl: articleToRestore.imageUrl, imageCaption: articleToRestore.imageCaption || '', 
+            photoCredit: articleToRestore.photoCredit || '', contentImages: articleToRestore.contentImages || [],
+            category: articleToRestore.category, authorId: String(articleToRestore.authorId), date: articleToRestore.date,
+            isPublished: false, bullfightLocation: articleToRestore.bullfightLocation || '', bullfightCattle: articleToRestore.bullfightCattle || '',
+            bullfightSummary: articleToRestore.bullfightSummary || '', bullfightResults: articleToRestore.bullfightResults || []
         };
-
-        saveArticle(activeArticle, true);
-
+        const articles = [...getArticles()];
+        articles.unshift(activeArticle);
+        saveArticlesToLocal(articles);
+        
         const newArchive = archive.filter(a => String(a.id) !== String(id));
         saveArchivedArticlesToLocal(newArchive);
         
+        notifyListeners();
         if (!skipSync) triggerCloudSync();
         return true;
     }
     return false;
-};
-
-export const getArticleById = (id: string): Article | undefined => {
-  return getArticles().find((a) => String(a.id) === String(id));
 };
