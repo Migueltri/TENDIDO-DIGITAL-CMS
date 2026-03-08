@@ -311,6 +311,15 @@ const ArticleForm: React.FC = () => {
         {draftRecovered && <span className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full font-bold">Borrador recuperado</span>}
       </div>
 
+      {/* MODAL DE RECORTE ACTIVO */}
+      {isCroppingGallery && pendingCrops.length > 0 && (
+        <ImageCropper 
+          imageSrc={pendingCrops[0]} 
+          onCropDone={handleCropDone} 
+          onCancel={handleCropCancel} 
+        />
+      )}
+
       <form className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-gray-100 space-y-8 relative">
         {isSubmitting && (
             <div className="absolute inset-0 bg-white/80 z-50 flex flex-col items-center justify-center rounded-xl backdrop-blur-sm">
@@ -420,7 +429,15 @@ const ArticleForm: React.FC = () => {
               </div>
               {formData.contentImages?.map((img, idx) => (
                   <div key={idx} className="bg-gray-50 rounded-xl border border-gray-200 p-2 relative group">
-                      <div className="relative aspect-video rounded-lg overflow-hidden mb-2"><img src={img.url} alt={`Galería ${idx}`} className="w-full h-full object-cover" /><button type="button" onClick={() => removeGalleryImage(idx)} className="absolute top-2 right-2 p-1.5 bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700 shadow-md" disabled={isSubmitting}><X size={14} /></button></div>
+                      
+                      {/* DISEÑO MEJORADO: Permite verticales usando object-contain y altura fija */}
+                      <div className="relative w-full h-48 bg-gray-100 rounded-lg overflow-hidden mb-2 flex items-center justify-center border border-gray-200">
+                          <img src={img.url} alt={`Galería ${idx}`} className="max-w-full max-h-full object-contain drop-shadow-sm" />
+                          <button type="button" onClick={() => removeGalleryImage(idx)} className="absolute top-2 right-2 p-1.5 bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700 shadow-md" disabled={isSubmitting}>
+                              <X size={14} />
+                          </button>
+                      </div>
+
                       <div className="space-y-2">
                         <input type="text" value={img.caption || ''} onChange={(e) => updateGalleryCaption(idx, e.target.value)} className="w-full p-2 text-xs border border-gray-200 rounded focus:border-brand-red outline-none bg-white text-gray-600" placeholder="Pie de foto" disabled={isSubmitting} />
                         <div className="flex items-center gap-1"><CameraIcon size={12} className="text-gray-400" /><input type="text" value={img.credit || ''} onChange={(e) => updateGalleryCredit(idx, e.target.value)} className="w-full p-1.5 text-xs border border-gray-200 rounded focus:border-brand-red outline-none bg-white text-gray-600" placeholder="Autor (Crédito)" disabled={isSubmitting} /></div>
