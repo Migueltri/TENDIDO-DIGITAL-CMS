@@ -56,7 +56,7 @@ const ArticleForm: React.FC = () => {
                     processedGallery = (processedGallery as any).map((url: string) => ({ url, caption: '' }));
                 }
                 setFormData({ ...article, contentImages: processedGallery });
-                if (editorRef.current) editorRef.current.innerHTML = article.content;
+                if (editorRef.current) editorRef.current.innerHTML = article.fullContent || article.content || '';
                 setHasLoaded(true);
               } else if (isDataReady) {
                 // Si la base de datos ya está lista pero no hay noticia, volvemos
