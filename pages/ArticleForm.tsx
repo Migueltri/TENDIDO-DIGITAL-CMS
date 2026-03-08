@@ -125,26 +125,50 @@ const ArticleForm: React.FC = () => {
     }
   };
 
+  // --- NUEVO SISTEMA DE COLA PARA RECORTAR GALERÍA ---
+  const [pendingCrops, setPendingCrops] = useState<string[]>([]);
+  const [isCroppingGallery, setIsCroppingGallery] = useState(false);
+
   const handleGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
-      setLoadingImage(true);
-      await new Promise(resolve => setTimeout(resolve, 100));
-      const newImages: GalleryImage[] = [];
-      try {
-          for (let i = 0; i < files.length; i++) {
-              const file = files[i];
-              const compressedUrl = await compressImage(file, 1000, 0.8);
-              newImages.push({ url: compressedUrl, caption: '', credit: '' });
-              await new Promise(resolve => setTimeout(resolve, 100));
-          }
-          setFormData(prev => ({ ...prev, contentImages: [...(prev.contentImages || []), ...newImages] }));
-          setFormIsDirty(true);
-      } catch (error) { alert("Error subiendo algunas imágenes."); } 
-      finally {
-          setLoadingImage(false);
-          if (galleryInputRef.current) galleryInputRef.current.value = '';
+      const newImagesToCrop = [];
+      for (let i = 0; i < files.length; i++) {
+        // Convertimos el archivo en una URL temporal para que el recortador pueda leerla
+        newImagesToCrop.push(URL.createObjectURL(files[i]));
       }
+      setPendingCrops(newImagesToCrop);
+      setIsCroppingGallery(true);
+      if (galleryInputRef.current) galleryInputRef.current.value = '';
+    }
+  };
+
+  const handleCropDone = (base64Image: string) => {
+    // 1. Guardamos la foto ya recortada
+    setFormData(prev => ({ 
+       ...prev, 
+       contentImages: [...(prev.contentImages || []), { url: base64Image, caption: '', credit: '' }] 
+    }));
+    setFormIsDirty(true);
+    
+    // 2. Pasamos a la siguiente foto de la cola (si subió varias)
+    const nextCrops = [...pendingCrops];
+    nextCrops.shift();
+    if (nextCrops.length > 0) {
+      setPendingCrops(nextCrops);
+    } else {
+      setIsCroppingGallery(false);
+    }
+  };
+
+  const handleCropCancel = () => {
+    // Si cancela, saltamos esta foto y vamos a la siguiente
+    const nextCrops = [...pendingCrops];
+    nextCrops.shift();
+    if (nextCrops.length > 0) {
+      setPendingCrops(nextCrops);
+    } else {
+      setIsCroppingGallery(false);
     }
   };
 
