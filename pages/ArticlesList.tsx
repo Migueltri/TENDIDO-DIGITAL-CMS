@@ -319,7 +319,10 @@ const ArticlesList: React.FC = () => {
                                 {article.isPublished && <button onClick={() => handleUnpublish(article)} className="p-2 text-gray-400 bg-gray-50 hover:bg-orange-50 hover:text-orange-600 rounded-lg transition-colors border border-transparent hover:border-orange-100"><EyeOff size={18} /></button>}
                                 <button onClick={() => setPreviewArticle(article)} className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"><Eye size={18} /></button>
                                 <Link to={`/editar-noticia/${article.id}`} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Edit2 size={18} /></Link>
-                                <button onClick={() => promptDelete(article.id, article.title)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={18} /></button>
+                                <button onClick={(e) => { 
+    e.stopPropagation(); 
+    handleDelete(article.id); }} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={18} />
+</button>
                               </>
                           )}
                           {viewMode === 'history' && (
