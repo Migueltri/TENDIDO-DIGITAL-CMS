@@ -55,9 +55,18 @@ const ArticleForm: React.FC = () => {
                 if (processedGallery.length > 0 && typeof processedGallery[0] === 'string') {
                     processedGallery = (processedGallery as any).map((url: string) => ({ url, caption: '' }));
                 }
-                setFormData({ ...article, contentImages: processedGallery });
-                if (editorRef.current) editorRef.current.innerHTML = article.fullContent || article.content || '';
+                // Extraemos el contenido real asegurando compatibilidad de nombres
+                const loadedContent = article.fullContent || article.content || '';
+                
+                setFormData({ ...article, contentImages: processedGallery, content: loadedContent });
                 setHasLoaded(true);
+                
+                // Forzamos a React a esperar 150ms para asegurar que el DOM existe antes de inyectar
+                setTimeout(() => {
+                    if (editorRef.current) {
+                        editorRef.current.innerHTML = loadedContent;
+                    }
+                }, 150);
               } else if (isDataReady) {
                 // Si la base de datos ya está lista pero no hay noticia, volvemos
                 navigate('/noticias');
