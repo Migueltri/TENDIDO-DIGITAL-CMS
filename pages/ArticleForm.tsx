@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import ImageCropper from '../components/ImageCropper';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getArticleById, getArticles, getAuthors, saveArticle, saveAuthor, subscribeToData, isDataReady } from '../services/dataService';
 import { compressImage } from '../services/imageService';
