@@ -28,7 +28,7 @@ export default function ImageCropper({ imageSrc, onCropDone, onCancel }: Props) 
       await new Promise((resolve) => { image.onload = resolve; });
 
       // Redimensionar inteligentemente (Máximo 1200px) para no reventar la base de datos
-      const MAX_WIDTH = 1200;
+      const MAX_WIDTH = 800;
       let finalWidth = croppedAreaPixels.width;
       let finalHeight = croppedAreaPixels.height;
 
@@ -53,7 +53,7 @@ export default function ImageCropper({ imageSrc, onCropDone, onCancel }: Props) 
           0, 0, finalWidth, finalHeight
         );
         // Generamos la imagen ya comprimida lista para guardar
-        onCropDone(canvas.toDataURL('image/jpeg', 0.85));
+        onCropDone(canvas.toDataURL('image/jpeg', 0.5));
       }
     } catch (e) {
       console.error("Error al procesar la imagen:", e);
@@ -67,10 +67,11 @@ export default function ImageCropper({ imageSrc, onCropDone, onCancel }: Props) 
       <div className="flex justify-between items-center p-4 bg-black text-white shadow-md">
         <button onClick={onCancel} className="p-2 bg-gray-800 rounded-full hover:bg-gray-700 transition"><X size={20} /></button>
         
-        <div className="flex gap-2 bg-gray-800 p-1 rounded-lg">
-          <button onClick={() => setAspect(16/9)} className={`px-3 py-1 text-xs md:text-sm rounded transition ${aspect === 16/9 ? 'bg-brand-red font-bold' : 'hover:bg-gray-700'}`}>Apaisado</button>
-          <button onClick={() => setAspect(4/5)} className={`px-3 py-1 text-xs md:text-sm rounded transition ${aspect === 4/5 ? 'bg-brand-red font-bold' : 'hover:bg-gray-700'}`}>Vertical</button>
-          <button onClick={() => setAspect(undefined)} className={`px-3 py-1 text-xs md:text-sm rounded transition ${aspect === undefined ? 'bg-brand-red font-bold' : 'hover:bg-gray-700'}`}>Libre</button>
+        <div className="flex gap-2 bg-gray-800 p-1 rounded-lg overflow-x-auto">
+          <button onClick={() => setAspect(16/9)} className={`px-3 py-1 text-xs md:text-sm whitespace-nowrap rounded transition ${aspect === 16/9 ? 'bg-brand-red font-bold' : 'hover:bg-gray-700'}`}>Apaisado (16:9)</button>
+          <button onClick={() => setAspect(3/4)} className={`px-3 py-1 text-xs md:text-sm whitespace-nowrap rounded transition ${aspect === 3/4 ? 'bg-brand-red font-bold' : 'hover:bg-gray-700'}`}>Vertical (3:4)</button>
+          <button onClick={() => setAspect(9/16)} className={`px-3 py-1 text-xs md:text-sm whitespace-nowrap rounded transition ${aspect === 9/16 ? 'bg-brand-red font-bold' : 'hover:bg-gray-700'}`}>Vertical Móvil (9:16)</button>
+          <button onClick={() => setAspect(undefined)} className={`px-3 py-1 text-xs md:text-sm whitespace-nowrap rounded transition ${aspect === undefined ? 'bg-brand-red font-bold' : 'hover:bg-gray-700'}`}>Libre</button>
         </div>
 
         <button onClick={saveCrop} className="p-2 bg-brand-red hover:bg-red-700 rounded-full text-white flex items-center gap-2 px-4 font-bold transition">
