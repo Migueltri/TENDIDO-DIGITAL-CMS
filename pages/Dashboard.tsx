@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { getArticles, getAuthors } from '../services/dataService';
 import { syncWithGitHub, getSettings, verifyConnection } from '../services/githubService';
@@ -31,6 +30,12 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     // 1. Carga inicial local
+    // BORRAR ESTO DESPUÉS DE RECUPERAR LAS NOTICIAS
+import { saveArticlesToLocal } from '../../services/dataService';
+
+// Dentro de tu componente principal:
+const noticiasRecuperadas = [ ...PEGA_AQUÍ_TODO_EL_JSON_QUE_COPIASTE_DE_GITHUB... ];
+saveArticlesToLocal(noticiasRecuperadas.articles);
     setArticles(getArticles());
     setAuthorCount(getAuthors().length);
 
