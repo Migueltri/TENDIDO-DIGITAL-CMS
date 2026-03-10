@@ -118,19 +118,22 @@ const fetchRemoteDB = async (settings: AppSettings): Promise<{ sha: string, data
 
     try {
         const decoded = await decodeBase64(rawContent);
-        if (!decoded.trim()) {
+        if (!decoded || !decoded.trim()) {
              return {
                 sha: json.sha,
                 data: { articles: [], authors: [], archivedArticles: [], lastUpdated: '' }
             };
         }
+        // Intentamos limpiar posibles caracteres invisibles al inicio/final del string
+        const cleanJSON = decoded.trim().replace(/^\uFEFF/, '');
         return {
             sha: json.sha,
-            data: JSON.parse(decoded)
+            data: JSON.parse(cleanJSON)
         };
-    } catch (e) {
-        console.error("Error parsing remote DB:", e);
-        throw new Error("El archivo remoto db.json está corrupto o no es JSON válido.");
+    } catch (e: any) {
+        console.error("Error detallado:", e);
+        // Esto te dirá en la pantalla exactamente qué carácter sobra o falta
+        throw new Error(`JSON no válido: ${e.message}`);
     }
 };
 
