@@ -262,7 +262,7 @@ export const restoreArticle = (id: string, skipSync = false): boolean => {
 };
 
 // Al final de src/services/dataService.ts
-import backupData from './backup.json';
+import backupData from '../../backup.json';
 
 export const injectBackup = () => {
   try {
