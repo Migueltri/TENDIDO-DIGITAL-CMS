@@ -262,9 +262,9 @@ export const restoreArticle = (id: string, skipSync = false): boolean => {
 };
 
 // Al final de src/services/dataService.ts
-import backupData from '../../backup.json';
+// import backupData from '../../backup.json';
 
-export const injectBackup = () => {
+//export const injectBackup = () => {
   try {
     if (backupData && backupData.articles) {
       localStorage.setItem('articles', JSON.stringify(backupData.articles));
