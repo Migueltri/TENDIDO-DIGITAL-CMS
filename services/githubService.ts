@@ -227,8 +227,6 @@ const executeWithRetry = async (
     }
 };
 
-const pushToGitHub = async (settings: AppSettings, data: DatabaseSchema, sha: string, message: string) => {
-// 🔥 OPTIMIZACIÓN: FileReader nativo (A prueba de caracteres especiales)
 const encodeBase64 = async (str: string): Promise<string> => {
     const bytes = new TextEncoder().encode(str);
     const blob = new Blob([bytes]);
@@ -248,10 +246,10 @@ const pushToGitHub = async (settings: AppSettings, data: DatabaseSchema, sha: st
     const contentEncoded = await encodeBase64(jsonString);
 
     const body = {
-      message: message,
-      content: contentEncoded,
-      sha: sha ? sha : undefined,
-      branch: settings.repoBranch 
+        message: message,
+        content: contentEncoded,
+        sha: sha || undefined,
+        branch: settings.repoBranch 
     };
 
     const putUrl = `https://api.github.com/repos/${settings.repoOwner}/${settings.repoName}/contents/${settings.filePath}`;
