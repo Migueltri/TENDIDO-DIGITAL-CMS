@@ -61,25 +61,6 @@ interface DatabaseSchema {
   lastUpdated: string;
 }
 
-// 🔥 NUEVA OPTIMIZACIÓN: Bucle por bloques (Evita el límite de memoria del navegador)
-const encodeBase64 = async (str: string): Promise<string> => {
-    const bytes = new TextEncoder().encode(str);
-    let binary = '';
-    const chunkSize = 8192;
-    for (let i = 0; i < bytes.length; i += chunkSize) {
-        const chunk = Array.from(bytes.subarray(i, i + chunkSize));
-        binary += String.fromCharCode.apply(null, chunk);
-    }
-    return btoa(binary);
-};
-
-// 🔥 OPTIMIZACIÓN EXTREMA: Usamos fetch nativo para decodificar al instante
-const decodeBase64 = async (b64: string): Promise<string> => {
-    const url = `data:application/json;base64,${b64}`;
-    const response = await fetch(url);
-    return await response.text();
-};
-
 const fetchRemoteDB = async (settings: AppSettings): Promise<{ sha: string, data: DatabaseSchema } | null> => {
     if (!settings.githubToken || !settings.repoOwner || !settings.repoName) return null;
 
