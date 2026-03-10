@@ -228,14 +228,29 @@ const executeWithRetry = async (
 };
 
 const pushToGitHub = async (settings: AppSettings, data: DatabaseSchema, sha: string, message: string) => {
-    // 🔥 OPTIMIZACIÓN: Eliminamos el formato con espacios (null, 2) para reducir drásticamente el tamaño del archivo
+    // 🔥 OPTIMIZACIÓN EXTREMA: Restauramos FileReader (100% a prueba de tildes, eñes y caracteres especiales)
+const encodeBase64 = async (str: string): Promise<string> => {
+    const bytes = new TextEncoder().encode(str);
+    const blob = new Blob([bytes]);
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            const dataUrl = reader.result as string;
+            resolve(dataUrl.split(',')[1]);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+};
+
+const pushToGitHub = async (settings: AppSettings, data: DatabaseSchema, sha: string, message: string) => {
     const jsonString = JSON.stringify(data);
     const contentEncoded = await encodeBase64(jsonString);
 
     const body = {
       message: message,
       content: contentEncoded,
-      sha: sha || undefined,
+      sha: sha ? sha : undefined,
       branch: settings.repoBranch 
     };
 
@@ -250,8 +265,9 @@ const pushToGitHub = async (settings: AppSettings, data: DatabaseSchema, sha: st
     });
 
     if (!putRes.ok) {
+        // 🔥 AQUÍ ESTÁ LA MAGIA: Obligamos a GitHub a confesar el motivo exacto del Error 422
         const errData = await putRes.json().catch(() => ({}));
-        throw new Error(`${putRes.status} - ${errData.message || putRes.statusText}`);
+        throw new Error(`${putRes.status} - MOTIVO REAL: ${errData.message || 'Desconocido'}`);
     }
     return true;
 };
