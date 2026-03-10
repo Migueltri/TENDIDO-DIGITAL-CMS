@@ -228,7 +228,7 @@ const executeWithRetry = async (
 };
 
 const pushToGitHub = async (settings: AppSettings, data: DatabaseSchema, sha: string, message: string) => {
-    // 🔥 OPTIMIZACIÓN EXTREMA: Restauramos FileReader (100% a prueba de tildes, eñes y caracteres especiales)
+// 🔥 OPTIMIZACIÓN: FileReader nativo (A prueba de caracteres especiales)
 const encodeBase64 = async (str: string): Promise<string> => {
     const bytes = new TextEncoder().encode(str);
     const blob = new Blob([bytes]);
@@ -265,13 +265,12 @@ const pushToGitHub = async (settings: AppSettings, data: DatabaseSchema, sha: st
     });
 
     if (!putRes.ok) {
-        // 🔥 AQUÍ ESTÁ LA MAGIA: Obligamos a GitHub a confesar el motivo exacto del Error 422
         const errData = await putRes.json().catch(() => ({}));
-        throw new Error(`${putRes.status} - MOTIVO REAL: ${errData.message || 'Desconocido'}`);
+        throw new Error(`${putRes.status} - MOTIVO: ${errData.message || 'Desconocido'}`);
     }
     return true;
 };
-
+  
 export const syncWithGitHub = async (forcePush: boolean = false): Promise<{ success: boolean; message: string }> => {
     let settings = getSettings();
     if (!settings.githubToken) return { success: false, message: 'Modo Local (Sin configuración de GitHub).' };
