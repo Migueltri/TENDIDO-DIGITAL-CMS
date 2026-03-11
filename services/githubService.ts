@@ -290,6 +290,45 @@ export const uploadImageAndGetUrl = async (settings: any, base64Image: string, f
     return `/images/noticias/${uniqueName}`;
 };
 
+export const processArticleImages = async (article: Article, settings: any) => {
+    // 1. Procesar imagen principal
+    if (article.imageUrl?.startsWith('data:image')) {
+        article.imageUrl = await uploadImageAndGetUrl(settings, article.imageUrl, 'portada.jpg');
+    }
+
+    // 2. Procesar galería de imágenes
+    if (article.contentImages && article.contentImages.length > 0) {
+        for (let img of article.contentImages) {
+            if (img.url.startsWith('data:image')) {
+                img.url = await uploadImageAndGetUrl(settings, img.url, 'galeria.jpg');
+            }
+        }
+    }
+
+    // 3. EXTRA: Procesar imágenes pegadas en el EDITOR (Cuerpo de la noticia)
+    // Esto evita que el JSON pese 20MB por una foto pegada en el texto
+    if (article.content && article.content.includes('data:image')) {
+        const regex = /src="(data:image\/[^;]+;base64,[^"]+)"/g;
+        let match;
+        let nuevoContenido = article.content;
+
+        while ((match = regex.exec(article.content)) !== null) {
+            const base64Full = match[1];
+            try {
+                // Subimos la imagen del cuerpo del texto
+                const urlSubida = await uploadImageAndGetUrl(settings, base64Full, 'contenido.jpg');
+                // Reemplazamos el código gigante por la ruta corta
+                nuevoContenido = nuevoContenido.replace(base64Full, urlSubida);
+            } catch (e) {
+                console.error("No se pudo extraer imagen del contenido", e);
+            }
+        }
+        article.content = nuevoContenido;
+    }
+    
+    return article;
+};
+
 export const syncWithGitHub = async (forcePush: boolean = false): Promise<{ success: boolean; message: string }> => {
     const settings = getSettings();
     if (!settings.githubToken) return { success: false, message: 'Modo Local.' };
