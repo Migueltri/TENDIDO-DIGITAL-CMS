@@ -8,7 +8,7 @@ const Settings: React.FC = () => {
     githubToken: '',
     repoOwner: 'migueltri',
     repoName: 'tendido-digital-cms',
-    filePath: 'public/data/db.json',
+    filePath: 'public/data/dataDB.json',
     repoBranch: 'main',
     vercelDeployHook: ''
   };
