@@ -263,161 +263,61 @@ const pushToGitHub = async (settings: AppSettings, data: DatabaseSchema, sha: st
     return true;
 };
   
-export const syncWithGitHub = async (forcePush: boolean = false): Promise<{ success: boolean; message: string }> => {
-    let settings = getSettings();
-    if (!settings.githubToken) return { success: false, message: 'Modo Local (Sin configuración de GitHub).' };
+export const uploadImageAndGetUrl = async (settings: any, base64Image: string, fileName: string): Promise<string> => {
+    if (!base64Image || !base64Image.startsWith('data:image')) return base64Image;
 
-    settings = {
-        ...settings,
-        githubToken: (settings.githubToken || '').trim(),
-        repoOwner: (settings.repoOwner || '').trim(),
-        repoName: (settings.repoName || '').trim(),
-        repoBranch: (settings.repoBranch || 'main').trim()
-    };
+    const cleanBase64 = base64Image.replace(/^data:image\/\w+;base64,/, "");
+    const extension = base64Image.split(';')[0].split('/')[1] || 'jpg';
+    const uniqueName = `noticia-${Date.now()}-${Math.floor(Math.random() * 1000)}.${extension}`;
+    const imagePath = `public/images/noticias/${uniqueName}`;
+
+    const url = `https://api.github.com/repos/${settings.repoOwner}/${settings.repoName}/contents/${imagePath}`;
+    
+    const response = await fetch(url, {
+        method: 'PUT',
+        headers: {
+            'Authorization': `token ${settings.githubToken}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            message: `📸 Auto-upload: ${uniqueName}`,
+            content: cleanBase64,
+            branch: settings.repoBranch
+        })
+    });
+
+    if (!response.ok) throw new Error("Error al subir la imagen a la nube");
+    return `/images/noticias/${uniqueName}`;
+};
+
+export const syncWithGitHub = async (forcePush: boolean = false): Promise<{ success: boolean; message: string }> => {
+    const settings = getSettings();
+    if (!settings.githubToken) return { success: false, message: 'Modo Local.' };
 
     try {
         await executeWithRetry('syncMaster', async () => {
-            if (!settings.repoBranch || settings.repoBranch === 'main') {
-                try {
-                    const repoUrl = `https://api.github.com/repos/${settings.repoOwner}/${settings.repoName}`;
-                    const repoRes = await fetch(repoUrl, {
-                        headers: { 
-                            'Authorization': `token ${settings.githubToken}`,
-                            'Accept': 'application/vnd.github.v3+json'
-                        }
-                    });
-                    if (repoRes.ok) {
-                        const repoData = await repoRes.json();
-                        if (repoData.default_branch) {
-                            settings.repoBranch = repoData.default_branch;
-                        }
-                    }
-                } catch (e) {
-                    console.warn("Could not fetch default branch", e);
-                }
-            }
-
             const remoteInfo = await fetchRemoteDB(settings);
-            
             let remoteDB: DatabaseSchema = remoteInfo ? remoteInfo.data : { articles: [], authors: [], archivedArticles: [], lastUpdated: '' };
             let sha = remoteInfo ? remoteInfo.sha : '';
 
-            const localArticles = getArticles();
-            const localArchive = getArchivedArticles();
-            const localAuthors = getAuthors();
+            remoteDB.articles = getArticles();
+            remoteDB.authors = getAuthors();
+            remoteDB.archivedArticles = getArchivedArticles();
+            remoteDB.lastUpdated = new Date().toISOString();
 
-            let hasChanges = false;
+            const publishedArticles = remoteDB.articles.filter(a => a.isPublished);
+            const commitMessage = forcePush 
+                ? `🚀 Publicación Web: ${publishedArticles.length} noticias activas`
+                : '🔄 Sync Automático';
 
-            const mergedAuthorsMap = new Map<string, Author>();
-            remoteDB.authors.forEach(a => mergedAuthorsMap.set(String(a.id), a));
+            await pushToGitHub(settings, remoteDB, sha, commitMessage);
             
-            localAuthors.forEach(lA => {
-                const rA = mergedAuthorsMap.get(String(lA.id));
-                if (rA) {
-                    const localTime = lA.lastModified ? new Date(lA.lastModified).getTime() : 0;
-                    const remoteTime = rA.lastModified ? new Date(rA.lastModified).getTime() : 0;
-                    if (localTime >= remoteTime) mergedAuthorsMap.set(String(lA.id), lA);
-                } else {
-                    mergedAuthorsMap.set(String(lA.id), lA);
-                }
-            });
-            remoteDB.authors = Array.from(mergedAuthorsMap.values());
-
-            const mergedArticlesMap = new Map<string, Article>();
-            if (!remoteDB.articles) remoteDB.articles = [];
-            
-            remoteDB.articles.forEach(a => mergedArticlesMap.set(String(a.id), a));
-
-            const remoteArchivedIds = new Set((remoteDB.archivedArticles || []).map(a => String(a.id)));
-
-            localArticles.forEach(lA => {
-                if (remoteArchivedIds.has(String(lA.id))) {
-                    const remoteArchivedItem = remoteDB.archivedArticles?.find(a => String(a.id) === String(lA.id));
-                    const archivedTime = remoteArchivedItem?.archivedAt ? new Date(remoteArchivedItem.archivedAt).getTime() : 0;
-                    const localTime = lA.lastModified ? new Date(lA.lastModified).getTime() : 0;
-                    
-                    if (localTime <= archivedTime) {
-                        return; 
-                    }
-                }
-
-                const rA = mergedArticlesMap.get(String(lA.id));
-                if (rA) {
-                    const localTime = lA.lastModified ? new Date(lA.lastModified).getTime() : 0;
-                    const remoteTime = rA.lastModified ? new Date(rA.lastModified).getTime() : 0;
-                    if (localTime >= remoteTime) {
-                        mergedArticlesMap.set(String(lA.id), lA);
-                    }
-                } else {
-                    mergedArticlesMap.set(String(lA.id), lA);
-                }
-            });
-            
-            const mergedArchiveMap = new Map<string, ArchivedArticle>();
-            if (!remoteDB.archivedArticles) remoteDB.archivedArticles = [];
-            remoteDB.archivedArticles.forEach(a => mergedArchiveMap.set(String(a.id), a));
-
-            localArchive.forEach(lA => {
-                mergedArchiveMap.set(String(lA.id), lA);
-            });
-
-            mergedArchiveMap.forEach((archivedItem, id) => {
-                if (mergedArticlesMap.has(id)) {
-                    const activeItem = mergedArticlesMap.get(id);
-                    
-                    const activeTime = activeItem?.lastModified ? new Date(activeItem.lastModified).getTime() : 0;
-                    const archivedTime = archivedItem.archivedAt ? new Date(archivedItem.archivedAt).getTime() : 0;
-
-                    if (activeTime > archivedTime) {
-                        mergedArchiveMap.delete(id); 
-                    } else {
-                        mergedArticlesMap.delete(id);
-                    }
-                }
-            });
-
-            const newArticles = Array.from(mergedArticlesMap.values());
-            const newArchivedArticles = Array.from(mergedArchiveMap.values());
-            const newAuthors = Array.from(mergedAuthorsMap.values());
-
-            hasChanges = 
-                JSON.stringify(remoteDB.articles) !== JSON.stringify(newArticles) ||
-                JSON.stringify(remoteDB.archivedArticles) !== JSON.stringify(newArchivedArticles) ||
-                JSON.stringify(remoteDB.authors) !== JSON.stringify(newAuthors);
-
-            remoteDB.articles = newArticles;
-            remoteDB.archivedArticles = newArchivedArticles;
-            remoteDB.authors = newAuthors;
-            
-            saveArticlesToLocal(remoteDB.articles);
-            saveAuthorsToLocal(remoteDB.authors);
-            saveArchivedArticlesToLocal(remoteDB.archivedArticles);
-
-            if (hasChanges || !sha) {
-                remoteDB.lastUpdated = new Date().toISOString();
-                
-                const publishedArticles = remoteDB.articles.filter(a => a.isPublished);
-                const commitMessage = forcePush 
-                    ? `🚀 Publicación Web: ${publishedArticles.length} noticias activas actualizadas`
-                    : '🔄 Sync Automático: Guardado de seguridad';
-
-                await pushToGitHub(settings, remoteDB, sha, commitMessage);
-                
-                if (settings.vercelDeployHook) {
-                    try {
-                        await fetch(settings.vercelDeployHook, { method: 'POST' });
-                        console.log("Vercel deploy hook triggered.");
-                    } catch (e) {
-                        console.error("Error triggering Vercel deploy hook:", e);
-                    }
-                }
-            } else {
-                console.log("No hay cambios locales para subir. Sincronización completada.");
+            if (settings.vercelDeployHook) {
+                await fetch(settings.vercelDeployHook, { method: 'POST' }).catch(() => {});
             }
         });
 
-        return { success: true, message: '✅ Cambios subidos. Vercel está desplegando la web (tardará 1-2 minutos).' };
-
+        return { success: true, message: '✅ Cambios subidos correctamente.' };
     } catch (e: any) {
         return { success: false, message: `Error Sync: ${e.message}` };
     }
