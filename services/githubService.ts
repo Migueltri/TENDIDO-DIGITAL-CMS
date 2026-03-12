@@ -330,6 +330,7 @@ export const processArticleImages = async (article: Article, settings: any) => {
 };
 
 export const syncWithGitHub = async (forcePush: boolean = false): Promise<{ success: boolean; message: string }> => {
+    return;
     const settings = getSettings();
     if (!settings.githubToken) return { success: false, message: 'Modo Local.' };
 
