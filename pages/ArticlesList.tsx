@@ -104,7 +104,7 @@ const ArticlesList: React.FC = () => {
       try {
           const success = restoreArticle(id);
           if (success) {
-              const result = await syncWithGitHub();
+              const result = await syncWithGitHub(true);
               if (result.success) {
                   setFilterCategory('all'); setSearchTerm(''); setViewMode('active'); window.scrollTo(0,0);
               } else {
@@ -126,7 +126,7 @@ const ArticlesList: React.FC = () => {
       try {
           archiveArticle(idToDelete, currentUser?.id || 'unknown'); // Ahora no bloquea nada y envía al historial
           stopAutoSync(); 
-          syncWithGitHub().then(result => {
+          syncWithGitHub(true).then(result => {
               if (result.success) setPendingChanges(0); 
               else {
                   console.warn("Error actualizando la web: " + result.message);
