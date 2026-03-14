@@ -333,8 +333,7 @@ export const processArticleImages = async (article: Article, settings: any) => {
 };
 
 export const syncWithGitHub = async (forcePush: boolean = false): Promise<{ success: boolean; message: string }> => {
-    // CORRECCIÓN: Si no es un guardado forzado (manual), abortamos la operación.
-    // Esto mata el bucle automático sin romper TypeScript ni el botón de publicar.
+    // Si no es un guardado forzado (manual), abortamos la operación.
     if (!forcePush) {
         return { success: true, message: 'Sincronización automática ignorada por seguridad.' };
     }
@@ -344,26 +343,83 @@ export const syncWithGitHub = async (forcePush: boolean = false): Promise<{ succ
 
     try {
         await executeWithRetry('syncMaster', async () => {
+            // 1. DESCARGAMOS LA VERSIÓN REAL Y ACTUALIZADA DE GITHUB
             const remoteInfo = await fetchRemoteDB(settings);
-            let remoteDB: DatabaseSchema = remoteInfo ? remoteInfo.data : { articles: [], authors: [], archivedArticles: [], lastUpdated: '' };
-            let sha = remoteInfo ? remoteInfo.sha : '';
-
-            remoteDB.articles = getArticles();
-            remoteDB.authors = getAuthors();
-            remoteDB.archivedArticles = getArchivedArticles();
-            remoteDB.lastUpdated = new Date().toISOString();
-
-            const publishedArticles = remoteDB.articles.filter(a => a.isPublished);
-            const commitMessage = `🚀 Publicación Web: ${publishedArticles.length} noticias activas`;
-
-            await pushToGitHub(settings, remoteDB, sha, commitMessage);
             
+            // 2. OBTENEMOS NUESTRA VERSIÓN LOCAL (Lo que acabamos de guardar/borrar en nuestro PC)
+            const localArticles = getArticles();
+            const localArchive = getArchivedArticles();
+            const localAuthors = getAuthors();
+
+            let sha = remoteInfo ? remoteInfo.sha : '';
+            
+            // Objeto final que subiremos
+            let finalDB: DatabaseSchema = {
+                articles: [],
+                archivedArticles: [],
+                authors: localAuthors, // Los autores no suelen tener conflictos de edición simultánea
+                lastUpdated: new Date().toISOString()
+            };
+
+            // --- FUSIÓN INTELIGENTE DE NOTICIAS ---
+            
+            if (remoteInfo && remoteInfo.data && remoteInfo.data.articles) {
+                const remoteArticles = remoteInfo.data.articles;
+                const remoteArchive = remoteInfo.data.archivedArticles || [];
+
+                // A. Mezclar Noticias Activas
+                // Mantenemos todas las noticias de GitHub EXCEPTO las que hemos borrado localmente o editado
+                const mergedArticles = remoteArticles.filter(remoteArticle => {
+                    // Si la noticia remota está en nuestro historial local, significa que LA HEMOS BORRADO
+                    const wasArchivedLocally = localArchive.some(a => String(a.id) === String(remoteArticle.id));
+                    return !wasArchivedLocally;
+                }).map(remoteArticle => {
+                    // Si hemos editado una noticia localmente, usamos nuestra versión, si no, la de GitHub
+                    const localEdit = localArticles.find(a => String(a.id) === String(remoteArticle.id));
+                    return localEdit || remoteArticle;
+                });
+
+                // Añadimos las noticias NUEVAS que hayamos creado localmente y que no estén en GitHub
+                const newLocalArticles = localArticles.filter(localA => 
+                    !remoteArticles.some(remoteA => String(remoteA.id) === String(localA.id))
+                );
+
+                finalDB.articles = [...newLocalArticles, ...mergedArticles].sort((a, b) => 
+                    new Date(b.date).getTime() - new Date(a.date).getTime()
+                );
+
+                // B. Mezclar Historial de Archivadas
+                // Sumamos el historial de GitHub con nuestro nuevo historial local sin duplicados
+                const mergedArchive = [...localArchive];
+                remoteArchive.forEach(remoteArchivedItem => {
+                    if (!mergedArchive.some(localArchivedItem => String(localArchivedItem.id) === String(remoteArchivedItem.id))) {
+                        mergedArchive.push(remoteArchivedItem);
+                    }
+                });
+                finalDB.archivedArticles = mergedArchive;
+
+            } else {
+                // Si GitHub estaba vacío o es la primera vez, subimos lo local a lo bruto
+                finalDB.articles = localArticles;
+                finalDB.archivedArticles = localArchive;
+            }
+
+            // 3. SUBIMOS EL ARCHIVO FUSIONADO
+            const publishedArticles = finalDB.articles.filter(a => a.isPublished);
+            const commitMessage = `🚀 Fusión Web: ${publishedArticles.length} noticias activas`;
+
+            await pushToGitHub(settings, finalDB, sha, commitMessage);
+            
+            // 4. ACTUALIZAMOS NUESTRA MEMORIA LOCAL CON LA FUSIÓN PARA VER LO MISMO QUE LOS COMPAÑEROS
+            saveArticlesToLocal(finalDB.articles);
+            saveArchivedArticlesToLocal(finalDB.archivedArticles || []);
+
             if (settings.vercelDeployHook) {
                 await fetch(settings.vercelDeployHook, { method: 'POST' }).catch(() => {});
             }
         });
 
-        return { success: true, message: '✅ Cambios subidos correctamente.' };
+        return { success: true, message: '✅ Cambios sincronizados y fusionados correctamente.' };
     } catch (e: any) {
         return { success: false, message: `Error Sync: ${e.message}` };
     }
