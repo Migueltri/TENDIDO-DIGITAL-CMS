@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getArticles, deleteArticle, getAuthors, saveArticle, stopAutoSync, getArchivedArticles, restoreArticle, subscribeToData } from '../services/dataService';
+import { getArticles, archiveArticle, getAuthors, saveArticle, stopAutoSync, getArchivedArticles, restoreArticle, subscribeToData } from '../services/dataService';
 import { syncWithGitHub } from '../services/githubService';
 import { Article, Category, Author, ArchivedArticle } from '../types';
 import { Link } from 'react-router-dom';
@@ -124,7 +124,7 @@ const ArticlesList: React.FC = () => {
       setArticleToDelete(null); // La ventana se cierra AL INSTANTE
       
       try {
-          deleteArticle(idToDelete, currentUser?.id || 'unknown'); // Ahora no bloquea nada
+          archiveArticle(idToDelete, currentUser?.id || 'unknown'); // Ahora no bloquea nada y envía al historial
           stopAutoSync(); 
           syncWithGitHub().then(result => {
               if (result.success) setPendingChanges(0); 
