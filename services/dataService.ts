@@ -218,33 +218,31 @@ export const saveArticle = (article: Article, skipSync = false): void => {
 
 export const archiveArticle = (id: string, authorId: string): boolean => {
     try {
-        // 1. Buscamos la noticia
-        const articleIndex = articles.findIndex(a => a.id === id);
-        if (articleIndex === -1) return false;
+        // 1. Usamos TUS funciones oficiales para acceder a la memoria de forma segura
+        const listaActivas = getArticles();
+        const listaHistorial = getArchivedArticles();
 
-        const articleToArchive = articles[articleIndex];
+        // 2. Buscamos la noticia exacta
+        const articleIndex = listaActivas.findIndex((a: any) => String(a.id) === String(id));
+        if (articleIndex === -1) throw new Error("No se encontró la noticia a borrar");
+
+        const articleToArchive = listaActivas[articleIndex];
         const originalStatus = articleToArchive.isPublished ? 'published' : 'draft';
-        articleToArchive.isPublished = false;
 
-        // 2. Comprobación de seguridad: Si la lista de historial no existe, la crea
-        if (!Array.isArray(archivedArticles)) {
-            archivedArticles = [];
-        }
-
-        // 3. Metemos la noticia al principio del historial (de forma segura)
-        archivedArticles.unshift({
+        // 3. Inyectamos la noticia al principio del historial
+        listaHistorial.unshift({
             ...articleToArchive,
+            isPublished: false,
             archivedAt: new Date().toISOString(),
             originalStatus: originalStatus
         });
 
-        // 4. Sacamos la noticia de la lista activa (de forma segura)
-        articles.splice(articleIndex, 1);
+        // 4. Eliminamos la noticia de la lista de activas
+        listaActivas.splice(articleIndex, 1);
 
-        saveToLocal();
+        console.log("Noticia enviada al historial correctamente.");
         return true;
-    } catch (err) {
-        // Si algo falla, dejamos rastro en la consola y avisamos a la interfaz
+    } catch (err: any) {
         console.error("Fallo interno en archiveArticle:", err);
         throw err; 
     }
