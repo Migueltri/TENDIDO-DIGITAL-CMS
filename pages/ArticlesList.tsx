@@ -133,7 +133,10 @@ const ArticlesList: React.FC = () => {
                   setPendingChanges(prev => prev + 1);
               }
           });
-      } catch (error) { alert("Error crítico al eliminar."); }
+      } catch (error: any) { 
+          alert("Error real detectado: " + error.message); 
+          console.error("Detalle del error:", error); 
+      }
     }
   };
 
