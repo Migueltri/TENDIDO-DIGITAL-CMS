@@ -238,6 +238,17 @@ const ArticleForm: React.FC = () => {
   
   const handleResultKeyDown = (e: React.KeyboardEvent) => { if (e.key === 'Enter') { e.preventDefault(); addResult(); } };
   const removeResult = (index: number) => { setFormData(prev => ({ ...prev, bullfightResults: prev.bullfightResults?.filter((_, i) => i !== index) })); setFormIsDirty(true); };
+  const editResult = (index: number) => {
+      const resultToEdit = formData.bullfightResults?.[index];
+      if (resultToEdit) {
+          // Volvemos a poner los datos en los inputs
+          setNewResult({ bullfighter: resultToEdit.bullfighter, result: resultToEdit.result });
+          // Lo quitamos de la lista consolidada
+          removeResult(index);
+          // Ponemos el cursor automáticamente para que el redactor escriba al instante
+          setTimeout(() => bullfighterInputRef.current?.focus(), 50);
+      }
+  };
   const handleFormat = (command: string) => { 
     document.execCommand(command, false); 
     setFormIsDirty(true);
@@ -441,7 +452,8 @@ const ArticleForm: React.FC = () => {
                         {formData.bullfightResults?.map((res, idx) => (
                             <div key={idx} className="flex items-center bg-white p-2 rounded border border-orange-200 shadow-sm animate-fade-in">
                                 <div className="flex-1"><span className="font-bold text-gray-800">{res.bullfighter}</span><span className="text-gray-400 mx-2">|</span><span className="text-gray-600 italic">{res.result}</span></div>
-                                <button type="button" onClick={() => removeResult(idx)} className="text-red-400 hover:text-red-600 p-1 rounded hover:bg-red-50" disabled={isSubmitting}><Trash2 size={16} /></button>
+                                <button type="button" onClick={() => editResult(idx)} className="text-blue-500 hover:text-blue-700 p-1 rounded hover:bg-blue-50 mr-1 transition-colors" title="Editar resultado" disabled={isSubmitting}><Edit2 size={16} /></button>
+                                <button type="button" onClick={() => removeResult(idx)} className="text-red-400 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors" title="Eliminar resultado" disabled={isSubmitting}><Trash2 size={16} /></button>
                             </div>
                         ))}
                     </div>
