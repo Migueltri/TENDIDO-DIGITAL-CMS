@@ -163,7 +163,18 @@ const Authors: React.FC = () => {
       }
   };
 
+  const getInstantImageUrl = (url: string) => {
+      if (!url) return '';
+      if (url.startsWith('/images/')) {
+          const s = getSettings();
+          // Lee directamente de GitHub para esquivar el tiempo de espera de Vercel
+          return `https://raw.githubusercontent.com/${s.repoOwner}/${s.repoName}/${s.repoBranch || 'main'}/public${url}`;
+      }
+      return url;
+  };
+
   const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>, name: string) => {
+      e.currentTarget.onerror = null; // CRÍTICO: Evita bucles infinitos si falla la imagen
       e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`;
   };
 
@@ -246,7 +257,7 @@ const Authors: React.FC = () => {
                     onClick={() => formFileInputRef.current?.click()}
                  >
                      {formData.imageUrl ? (
-                         <img src={formData.imageUrl} alt="Preview" className="w-full h-full object-cover" />
+                         <img src={getInstantImageUrl(formData.imageUrl)} alt="Preview" className="w-full h-full object-cover" />
                      ) : (
                          <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-400">
                              <User size={48} />
@@ -339,11 +350,11 @@ const Authors: React.FC = () => {
                  {/* Imagen de Perfil con Overlay de Edición */}
                  <div className="relative flex-shrink-0 group/img">
                      <img 
-                        src={author.imageUrl} 
-                        alt={author.name} 
-                        className="w-16 h-16 rounded-full object-cover border-2 border-gray-100 shadow-sm"
-                        onError={(e) => handleImageError(e, author.name)}
-                     />
+                                src={getInstantImageUrl(author.imageUrl)} 
+                                alt={author.name} 
+                                className="w-16 h-16 rounded-full object-cover border-2 border-gray-100 shadow-sm"
+                                onError={(e) => handleImageError(e, author.name)}
+                             />
                      
                      {/* Overlay Botón Cámara (Visible si es Admin o es el propio Usuario) */}
                      {canEditPhoto && (
