@@ -1,7 +1,6 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { getAuthors, saveAuthor, deleteAuthor } from '../services/dataService';
-import { syncWithGitHub } from '../services/githubService'; // Importamos la nueva función segura
+import { syncWithGitHub, uploadImageAndGetUrl, getSettings } from '../services/githubService';
 import { Author, SystemRole } from '../types';
 import { Plus, Trash2, User, ShieldCheck, UserCog, Edit2, Camera, X, Upload, Loader2, RefreshCcw } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -70,31 +69,36 @@ const Authors: React.FC = () => {
     if (!formData.name || !formData.role) return;
     setIsSaving(true);
 
+    let finalImageUrl = formData.imageUrl;
+
+    // EL BLINDAJE: Si la imagen es un código bruto nuevo, la subimos a GitHub como archivo real
+    if (finalImageUrl && finalImageUrl.startsWith('data:image')) {
+        try {
+            const settings = getSettings();
+            finalImageUrl = await uploadImageAndGetUrl(settings, finalImageUrl, 'perfil.jpg');
+        } catch (error) {
+            alert("❌ Error al subir la foto a la nube. Revisa tu conexión.");
+            setIsSaving(false);
+            return;
+        }
+    }
+
     const authorToSave: Author = {
       id: editingId || Date.now().toString(),
       name: formData.name,
       role: formData.role,
-      // Si imageUrl está vacía y estamos creando, ponemos avatar por defecto.
-      // Si estamos editando y está vacía, significaría que el usuario borró la foto (raro), 
-      // pero el handleEdit ya pre-cargó la foto existente.
-      imageUrl: formData.imageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(formData.name)}&background=random`,
+      imageUrl: finalImageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(formData.name)}&background=random`,
       systemRole: formData.systemRole
     };
 
-    // 1. Guardar local
     try {
         saveAuthor(authorToSave, true);
     } catch (error: any) {
         setIsSaving(false);
-        if (error.name === 'QuotaExceededError' || error.message?.includes('quota') || error.message?.includes('exceeded') || error.message === 'QuotaExceededError') {
-            alert("❌ Error: El almacenamiento local está lleno. Por favor, elimina autores o noticias antiguas.");
-        } else {
-            alert("❌ Error al guardar localmente: " + error.message);
-        }
+        alert("❌ Error al guardar localmente: " + error.message);
         return;
     }
     
-    // 2. Guardar en la nube (Merge Seguro)
     const result = await syncWithGitHub();
     
     setIsSaving(false);
@@ -128,27 +132,32 @@ const Authors: React.FC = () => {
   const handleQuickPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (file && photoUploadId) {
-          setIsSaving(true); // Mostrar algún indicador visual global si se desea
+          setIsSaving(true); 
           const reader = new FileReader();
           reader.onloadend = async () => {
-              const base64Image = reader.result as string;
-              
-              // Encontrar el autor actual
-              const authorToUpdate = authors.find(a => a.id === photoUploadId);
-              if (authorToUpdate) {
-                  const updatedAuthor = { ...authorToUpdate, imageUrl: base64Image };
+              try {
+                  const base64Image = reader.result as string;
+                  const settings = getSettings();
                   
-                  // 1. Guardar local
-                  saveAuthor(updatedAuthor, true);
+                  // Subimos la imagen como archivo real a la nube
+                  const cloudUrl = await uploadImageAndGetUrl(settings, base64Image, 'perfil-rapido.jpg');
                   
-                  // 2. Guardar en nube inmediatamente
-                  await syncWithGitHub();
-                  
-                  loadAuthors();
-                  alert("✅ Foto de perfil actualizada en la web.");
+                  const authorToUpdate = authors.find(a => a.id === photoUploadId);
+                  if (authorToUpdate) {
+                      const updatedAuthor = { ...authorToUpdate, imageUrl: cloudUrl };
+                      
+                      saveAuthor(updatedAuthor, true);
+                      await syncWithGitHub();
+                      
+                      loadAuthors();
+                      alert("✅ Foto de perfil actualizada y anclada en la web para siempre.");
+                  }
+              } catch (error) {
+                  alert("❌ Error al subir la imagen a la nube.");
+              } finally {
+                  setPhotoUploadId(null);
+                  setIsSaving(false);
               }
-              setPhotoUploadId(null);
-              setIsSaving(false);
           };
           reader.readAsDataURL(file);
       }
