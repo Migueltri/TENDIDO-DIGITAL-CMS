@@ -281,7 +281,7 @@ const ArticlesList: React.FC = () => {
                                     <button onClick={() => setPreviewArticle(article)} className="p-2 text-gray-600 bg-gray-100 rounded-lg"><Eye size={16} /></button>
                                     {viewMode === 'active' && (
                                         <>
-                                        <button onClick={(e) => { e.stopPropagation(); handleTogglePin(article); }} className={`p-2 rounded-lg ${article.isPinned ? 'text-white bg-blue-600' : 'text-blue-600 bg-blue-50'}`}><Pin size={16} /></button>
+                                        <button onClick={(e) => { e.stopPropagation(); handleTogglePin(article); }} className={`p-2 rounded-lg ${article.isPinned ? 'text-white bg-blue-600' : 'text-blue-600 bg-blue-50'}`}><Pin size={4} /></button>
                                         <Link to={`/editar-noticia/${article.id}`} className="p-2 text-blue-600 bg-blue-50 rounded-lg"><Edit2 size={16} /></Link>
                                         <button onClick={(e) => { e.stopPropagation(); promptDelete(article.id, article.title); }} className="p-2 text-red-600 bg-red-50 rounded-lg"><Trash2 size={16} /></button>
                                         </>
