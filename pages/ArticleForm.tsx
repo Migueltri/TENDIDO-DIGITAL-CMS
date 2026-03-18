@@ -431,9 +431,7 @@ const ArticleForm: React.FC = () => {
             </div>
             <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-700">Orden (Prioridad)</label>
-                <input type="number" min="0" name="customOrder" value={formData.customOrder || 0} onChange={(e) => setFormData(prev => ({ ...prev, customOrder: Number(e.target.value) }))} className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand-red/20 focus:border-brand-red outline-none bg-white font-medium" disabled={isSubmitting} title="0 = Normal por fecha. 1 = Primera, 2 = Segunda..." />
-            </div>
-        </div>
+                <input type="number" min="0" max="4" name="customOrder" value={formData.customOrder || 0} onChange={(e) => { let val = Number(e.target.value); if (val > 4) val = 4; if (val < 0) val = 0; setFormData(prev => ({ ...prev, customOrder: val })); }} className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand-red/20 focus:border-brand-red outline-none bg-white font-medium" disabled={isSubmitting} title="0 = Normal. 1 al 4 = Posición fijada." />
 
         <div className="space-y-2">
             <label className="block text-sm font-medium text-gray-700">Autor</label>
