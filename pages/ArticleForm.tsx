@@ -6,7 +6,7 @@ import { compressImage } from '../services/imageService';
 import { Article, Author, Category, BullfightResult, GalleryImage } from '../types';
 import { ArrowLeft, Image as ImageIcon, UploadCloud, X, Plus, Bold, Italic, List, Shield, MapPin, Award, Trash2, FileEdit, Send, Camera, Loader2, MessageSquare, Camera as CameraIcon, Link as LinkIcon, Calendar, Edit2 } from 'lucide-react';import { useAuth } from '../contexts/AuthContext';
 
-// TRADUCTOR DE IMÁGENES AL CMS (VERSIÓN CMS)
+// TRADUCTOR DE IMÁGENES AL CMS
 const getCMSImageUrl = (url: any) => {
     if (!url || typeof url !== 'string') return '';
     if (url.startsWith('data:image') || url.startsWith('http')) return url;
