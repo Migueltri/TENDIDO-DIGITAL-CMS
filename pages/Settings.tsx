@@ -19,6 +19,84 @@ const Settings: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [testStatus, setTestStatus] = useState<{ loading: boolean, msg: string, success?: boolean } | null>(null);
 
+// --- SCRIPT DE OPTIMIZACIÓN DE BASE DE DATOS (LA ASPIRADORA) ---
+  const [isOptimizing, setIsOptimizing] = useState(false);
+  const [optimizeProgress, setOptimizeProgress] = useState("");
+
+  const handleOptimizeDatabase = async () => {
+      if (!confirm("⚠️ ADVERTENCIA: Este proceso limpiará las noticias antiguas. Puede tardar entre 2 y 5 minutos. NO CIERRES LA PESTAÑA. ¿Comenzar?")) return;
+
+      setIsOptimizing(true);
+      try {
+          const { uploadImageAndGetUrl, getSettings, syncWithGitHub } = await import('../services/githubService');
+          const { getArticles, saveArticle } = await import('../services/dataService');
+
+          const settings = getSettings();
+          const articles = getArticles();
+          let modifiedCount = 0;
+
+          for (let i = 0; i < articles.length; i++) {
+              let article = articles[i];
+              let hasChanges = false;
+              setOptimizeProgress(`Analizando noticia ${i + 1} de ${articles.length}...`);
+
+              // 1. Limpiar Portada
+              if (article.imageUrl && article.imageUrl.startsWith('data:image')) {
+                  setOptimizeProgress(`Subiendo portada de noticia ${i + 1}...`);
+                  try {
+                      article.imageUrl = await uploadImageAndGetUrl(settings, article.imageUrl, `opt-portada-${article.id}.jpg`);
+                      hasChanges = true;
+                  } catch(e) { console.error("Error en portada", e); }
+              }
+
+              // 2. Limpiar Galería
+              if (article.contentImages && article.contentImages.length > 0) {
+                  for (let j = 0; j < article.contentImages.length; j++) {
+                      let img = article.contentImages[j];
+                      let urlToCheck = typeof img === 'string' ? img : img.url;
+
+                      if (urlToCheck && urlToCheck.startsWith('data:image')) {
+                          setOptimizeProgress(`Subiendo foto de galería ${j + 1} de la noticia ${i + 1}...`);
+                          try {
+                              const cloudUrl = await uploadImageAndGetUrl(settings, urlToCheck, `opt-galeria-${article.id}-${j}.jpg`);
+                              if (typeof img === 'string') {
+                                  article.contentImages[j] = cloudUrl;
+                              } else {
+                                  article.contentImages[j] = { ...img, url: cloudUrl };
+                              }
+                              hasChanges = true;
+                          } catch(e) { console.error("Error en galeria", e); }
+                      }
+                  }
+              }
+
+              if (hasChanges) {
+                  saveArticle(article, true); // Guardar localmente y en silencio
+                  modifiedCount++;
+              }
+          }
+
+          if (modifiedCount > 0) {
+              setOptimizeProgress("¡Limpieza terminada! Sincronizando el nuevo archivo superligero con GitHub...");
+              const result = await syncWithGitHub(true);
+              if (result.success) {
+                  alert(`✅ ¡OPERACIÓN ÉPICA COMPLETADA! Se han limpiado y aligerado ${modifiedCount} noticias.`);
+              } else {
+                  alert("⚠️ Se optimizó localmente, pero falló la subida final a GitHub: " + result.message);
+              }
+          } else {
+              alert("✅ La base de datos ya estaba limpia. No se encontraron imágenes pesadas.");
+          }
+
+      } catch (error: any) {
+          alert("❌ Error durante la optimización: " + error.message);
+      } finally {
+          setIsOptimizing(false);
+          setOptimizeProgress("");
+      }
+  };
+  // ------------------------------------------------------------------
+  
   useEffect(() => {
     let currentSettings = getSettings();
     
@@ -84,6 +162,22 @@ const Settings: React.FC = () => {
         <p className="text-gray-500">Configuración del repositorio de <strong>tendidodigital.es</strong>.</p>
       </div>
 
+{/* BOTÓN DE EMERGENCIA PARA OPTIMIZAR */}
+        <div className="bg-red-50 border border-red-200 p-6 rounded-xl mb-8 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div>
+                <h3 className="text-red-800 font-bold text-lg mb-1">Optimización Profunda de Base de Datos</h3>
+                <p className="text-red-600 text-sm">Convierte imágenes pesadas antiguas en URLs ligeras. Úsalo solo una vez para bajar el peso del archivo.</p>
+                {isOptimizing && <p className="font-mono text-xs text-brand-dark mt-2 font-bold animate-pulse">⏳ {optimizeProgress}</p>}
+            </div>
+            <button 
+                onClick={handleOptimizeDatabase} 
+                disabled={isOptimizing}
+                className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-bold transition-colors disabled:opacity-50 whitespace-nowrap shadow-sm"
+            >
+                {isOptimizing ? 'Optimizando...' : 'Iniciar Limpieza'}
+            </button>
+        </div>
+      
       {isConfigured && !isEditing && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden animate-fade-in">
               <div className="bg-green-50 p-4 border-b border-green-100 flex items-center justify-between">
