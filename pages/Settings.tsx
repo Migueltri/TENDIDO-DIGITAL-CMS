@@ -162,21 +162,23 @@ const Settings: React.FC = () => {
         <p className="text-gray-500">Configuración del repositorio de <strong>tendidodigital.es</strong>.</p>
       </div>
 
-{/* BOTÓN DE EMERGENCIA PARA OPTIMIZAR */}
-        <div className="bg-red-50 border border-red-200 p-6 rounded-xl mb-8 flex flex-col md:flex-row items-center justify-between gap-4">
-            <div>
-                <h3 className="text-red-800 font-bold text-lg mb-1">Optimización Profunda de Base de Datos</h3>
-                <p className="text-red-600 text-sm">Convierte imágenes pesadas antiguas en URLs ligeras. Úsalo solo una vez para bajar el peso del archivo.</p>
-                {isOptimizing && <p className="font-mono text-xs text-brand-dark mt-2 font-bold animate-pulse">⏳ {optimizeProgress}</p>}
-            </div>
-            <button 
-                onClick={handleOptimizeDatabase} 
-                disabled={isOptimizing}
-                className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-bold transition-colors disabled:opacity-50 whitespace-nowrap shadow-sm"
-            >
-                {isOptimizing ? 'Optimizando...' : 'Iniciar Limpieza'}
-            </button>
-        </div>
+{/* BOTÓN DE EMERGENCIA PARA OPTIMIZAR (Oculto temporalmente. Cambia 'false' por 'true' para mostrarlo) */}
+      {false && (
+          <div className="bg-red-50 border border-red-200 p-6 rounded-xl mb-8 flex flex-col md:flex-row items-center justify-between gap-4">
+              <div>
+                  <h3 className="text-red-800 font-bold text-lg mb-1">Optimización Profunda de Base de Datos</h3>
+                  <p className="text-red-600 text-sm">Convierte imágenes pesadas antiguas en URLs ligeras. Úsalo solo una vez para bajar el peso del archivo.</p>
+                  {isOptimizing && <p className="font-mono text-xs text-brand-dark mt-2 font-bold animate-pulse">⏳ {optimizeProgress}</p>}
+              </div>
+              <button 
+                  onClick={handleOptimizeDatabase} 
+                  disabled={isOptimizing}
+                  className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-bold transition-colors disabled:opacity-50 whitespace-nowrap shadow-sm"
+              >
+                  {isOptimizing ? 'Optimizando...' : 'Iniciar Limpieza'}
+              </button>
+          </div>
+      )}
       
       {isConfigured && !isEditing && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden animate-fade-in">
