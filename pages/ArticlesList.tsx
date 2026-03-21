@@ -34,8 +34,6 @@ const ArticlesList: React.FC = () => {
   const ITEMS_PER_PAGE = 10;
 
   useEffect(() => {
-
-useEffect(() => {
     setCurrentPage(1);
   }, [viewMode, filterCategory, searchTerm]);
 
