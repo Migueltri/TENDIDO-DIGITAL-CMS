@@ -6,6 +6,15 @@ import { compressImage } from '../services/imageService';
 import { Article, Author, Category, BullfightResult, GalleryImage } from '../types';
 import { ArrowLeft, Image as ImageIcon, UploadCloud, X, Plus, Bold, Italic, List, Shield, MapPin, Award, Trash2, FileEdit, Send, Camera, Loader2, MessageSquare, Camera as CameraIcon, Link as LinkIcon, Calendar, Edit2 } from 'lucide-react';import { useAuth } from '../contexts/AuthContext';
 
+// TRADUCTOR DE IMÁGENES AL CMS (VERSIÓN CMS)
+const getCMSImageUrl = (url: any) => {
+    if (!url || typeof url !== 'string') return '';
+    if (url.startsWith('data:image') || url.startsWith('http')) return url;
+    let cleanPath = url.startsWith('/') ? url.substring(1) : url;
+    if (!cleanPath.startsWith('images/')) cleanPath = `images/${cleanPath}`;
+    return `https://raw.githubusercontent.com/Migueltri/TENDIDO-DIGITAL-CMS/main/public/${cleanPath}`;
+};
+
 const ArticleForm: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -531,7 +540,7 @@ const ArticleForm: React.FC = () => {
           <div className={`border-2 border-dashed ${loadingImage ? 'border-brand-red bg-red-50' : 'border-gray-300 hover:bg-gray-50'} rounded-xl p-6 flex flex-col items-center justify-center text-center transition-colors cursor-pointer relative overflow-hidden`} onClick={() => !loadingImage && !isSubmitting && mainImageInputRef.current?.click()}>
              {loadingImage && <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/80"><Loader2 className="animate-spin text-brand-red mb-2" size={32} /><p className="text-xs font-bold text-gray-600">Procesando imagen...</p></div>}
              {formData.imageUrl ? (
-               <div className="relative w-full h-64"><img src={formData.imageUrl} alt="Portada" className="w-full h-full object-cover rounded-lg" /><div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity rounded-lg"><p className="text-white font-medium flex items-center gap-2"><UploadCloud size={20} /> Cambiar Imagen</p></div></div>
+               <div className="relative w-full h-64"><img src={getCMSImageUrl(formData.imageUrl)} alt="Portada" className="w-full h-full object-cover rounded-lg" /><div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity rounded-lg"><p className="text-white font-medium flex items-center gap-2"><UploadCloud size={20} /> Cambiar Imagen</p></div></div>
              ) : (
                <div className="py-8 space-y-2"><div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto text-gray-400"><UploadCloud size={24} /></div><p className="text-gray-600 font-medium">Haz clic para subir imagen</p></div>
              )}
@@ -557,7 +566,7 @@ const ArticleForm: React.FC = () => {
                       
                       {/* DISEÑO MEJORADO: Permite verticales usando object-contain y altura fija */}
                       <div className="relative w-full h-48 bg-gray-100 rounded-lg overflow-hidden mb-2 flex items-center justify-center border border-gray-200">
-                          <img src={img.url} alt={`Galería ${idx}`} className="max-w-full max-h-full object-contain drop-shadow-sm" />
+                          <img src={getCMSImageUrl(url)} alt={`Galería ${idx}`} className="max-w-full max-h-full object-contain drop-shadow-sm" />
                           <button type="button" onClick={() => removeGalleryImage(idx)} className="absolute top-2 right-2 p-1.5 bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700 shadow-md" disabled={isSubmitting}>
                               <X size={14} />
                           </button>
