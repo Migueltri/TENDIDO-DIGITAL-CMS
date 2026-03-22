@@ -134,9 +134,17 @@ const ArticleForm: React.FC = () => {
   const handleMainImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // En lugar de guardar directo, abrimos el recortador
-      setMainImageToCrop(URL.createObjectURL(file));
-      if (mainImageInputRef.current) mainImageInputRef.current.value = '';
+      setLoadingImage(true); // Bloqueamos la pantalla para que el usuario espere
+      try {
+        // Comprimimos la foto gigante del móvil a un máximo de 1200px antes de recortar
+        const compressed = await compressImage(file, 1200, 0.8);
+        setMainImageToCrop(compressed);
+      } catch (error) {
+        alert("Error procesando la imagen. Intenta con una foto más pequeña.");
+      } finally {
+        setLoadingImage(false);
+        if (mainImageInputRef.current) mainImageInputRef.current.value = '';
+      }
     }
   };
 
@@ -157,14 +165,22 @@ const ArticleForm: React.FC = () => {
   const handleGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
-      const newImagesToCrop = [];
-      for (let i = 0; i < files.length; i++) {
-        // Convertimos el archivo en una URL temporal para que el recortador pueda leerla
-        newImagesToCrop.push(URL.createObjectURL(files[i]));
+      setLoadingImage(true);
+      try {
+        const newImagesToCrop = [];
+        for (let i = 0; i < files.length; i++) {
+          // Comprimimos cada foto de la galería una por una antes de encolarlas
+          const compressed = await compressImage(files[i], 1200, 0.8);
+          newImagesToCrop.push(compressed);
+        }
+        setPendingCrops(newImagesToCrop);
+        setIsCroppingGallery(true);
+      } catch (error) {
+        alert("Error procesando las imágenes de la galería.");
+      } finally {
+        setLoadingImage(false);
+        if (galleryInputRef.current) galleryInputRef.current.value = '';
       }
-      setPendingCrops(newImagesToCrop);
-      setIsCroppingGallery(true);
-      if (galleryInputRef.current) galleryInputRef.current.value = '';
     }
   };
 
