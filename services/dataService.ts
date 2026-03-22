@@ -3,13 +3,15 @@ import { Article, ArchivedArticle, Author, Category } from '../types';
 
 const INITIAL_AUTHORS: Author[] = [
   { id: '1', name: 'Eduardo Elvira', role: 'Director', imageUrl: '/images/eduardo.jpg', systemRole: 'ADMIN' },
-  { id: '2', name: 'Nerea F.Elena', role: 'Redacción', imageUrl: '/images/nerea.jpg', systemRole: 'EDITOR' },
-  { id: '3', name: 'Manolo Herrera', role: 'Redacción', imageUrl: '/images/manolo.jpg', systemRole: 'EDITOR' },
-  { id: '4', name: 'Rubén Sánchez', role: 'Redacción', imageUrl: '/images/ruben.jpg', systemRole: 'EDITOR' },
-  { id: '5', name: 'Iris Rodríguez', role: 'Redacción', imageUrl: '/images/iris.jpg', systemRole: 'EDITOR' },
-  { id: '6', name: 'Antonio Tortosa', role: 'Redacción', imageUrl: '/images/antonio.jpg', systemRole: 'EDITOR' },
-  { id: '7', name: 'Inés Sáez', role: 'Redacción', imageUrl: '/images/ines.jpg', systemRole: 'EDITOR' },
-  { id: '8', name: 'Enrique Salazar', role: 'Redacción', imageUrl: '/images/enrique.jpg', systemRole: 'EDITOR' },
+  { id: '2', name: 'Nerea F.Elena', role: 'Redacción', imageUrl: '/images/nerea.jpg', systemRole: 'ADMIN' },
+  { id: '3', name: 'Manolo Herrera', role: 'Redacción', imageUrl: '/images/manolo.jpg', systemRole: 'ADMIN' },
+  { id: '4', name: 'Rubén Sánchez', role: 'Redacción', imageUrl: '/images/ruben.jpg', systemRole: 'ADMIN' },
+  { id: '5', name: 'Iris Rodríguez', role: 'Redacción', imageUrl: '/images/iris.jpg', systemRole: 'ADMIN' },
+  { id: '6', name: 'Antonio Tortosa', role: 'Redacción', imageUrl: '/images/antonio.jpg', systemRole: 'ADMIN' },
+  { id: '7', name: 'Inés Sáez', role: 'Redacción', imageUrl: '/images/ines.jpg', systemRole: 'ADMIN' },
+  { id: '8', name: 'Enrique Salazar', role: 'Redacción', imageUrl: '/images/enrique.jpg', systemRole: 'ADMIN' },
+  { id: '9', name: 'Ruben Castillo', role: 'Redacción', imageUrl: '/images/rubencas.jpg', systemRole: 'ADMIN' },
+  { id: '10', name: 'Pepe Riofrio', role: 'Redacción', imageUrl: '/images/peperi.jpg', systemRole: 'ADMIN' },
 ];
 
 export const INITIAL_ARTICLES: Article[] = [
