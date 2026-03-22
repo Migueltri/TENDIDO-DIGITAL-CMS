@@ -165,24 +165,35 @@ const ArticleForm: React.FC = () => {
   const handleGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    
+
+    // 1. FRENO DE EMERGENCIA TÉCNICO: Límite estricto para no reventar la RAM móvil
+    if (files.length > 5) {
+      alert("⛔ LÍMITE DE MEMORIA: El navegador móvil no soporta procesar tantas fotos de alta calidad a la vez.\n\nPor favor, selecciona un máximo de 5 fotos por cada subida. Puedes repetir el proceso las veces que necesites.");
+      if (galleryInputRef.current) galleryInputRef.current.value = '';
+      return;
+    }
+
     setLoadingImage(true);
+
     try {
-      const autoAddedImages = [];
-      // Comprimimos y procesamos UNA A UNA para no reventar la RAM del móvil
+      // 2. PROCESAMIENTO GOTA A GOTA (Para no ahogar el procesador)
       for (let i = 0; i < files.length; i++) {
-        const compressed = await compressImage(files[i], 1200, 0.8);
-        autoAddedImages.push({ url: compressed, caption: '', credit: '' });
+        // Comprimimos de forma más segura: máximo 1000px y 70% de calidad
+        const compressed = await compressImage(files[i], 1000, 0.7);
+
+        // Guardamos la foto en la pantalla UNA a UNA, no todas de golpe al final
+        setFormData(prev => ({
+           ...prev,
+           contentImages: [...(prev.contentImages || []), { url: compressed, caption: '', credit: '' }]
+        }));
+        setFormIsDirty(true);
+
+        // 3. EL RESPIRADOR: Obligamos al sistema a pausar 200ms. 
+        // Esto le da tiempo al móvil a limpiar la RAM antes de cargar la siguiente foto.
+        await new Promise(resolve => setTimeout(resolve, 200));
       }
-      
-      // Inyectamos todas directamente a la galería, saltándonos el recortador
-      setFormData(prev => ({
-         ...prev,
-         contentImages: [...(prev.contentImages || []), ...autoAddedImages]
-      }));
-      setFormIsDirty(true);
     } catch (error) {
-      alert("⚠️ El móvil se ha quedado sin memoria. Sube las fotos en grupos más pequeños (ej: de 5 en 5).");
+      alert("⚠️ El móvil se ha quedado sin memoria procesando una foto. Refresca la página y prueba con fotos menos pesadas.");
     } finally {
       setLoadingImage(false);
       if (galleryInputRef.current) galleryInputRef.current.value = '';
