@@ -285,11 +285,12 @@ export const uploadImageAndGetUrl = async (settings: any, base64Image: string, f
     const imagePath = `public/images/noticias/${uniqueName}`;
 
     const url = `https://api.github.com/repos/${settings.repoOwner}/${settings.repoName}/contents/${imagePath}`;
-    const response = await fetch(url, {
-        method: 'PUT',
-        headers: { 'Authorization': `token ${settings.githubToken}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: `[skip ci] 📸 Auto-upload: ${uniqueName}`, content: cleanBase64, branch: settings.repoBranch })
-    });
+    const response = await fetch(url, {
+        method: 'PUT',
+        headers: { 'Authorization': `token ${settings.githubToken}`, 'Content-Type': 'application/json' },
+        // AQUÍ ESTÁ LA CLAVE: El [skip ci] tiene que estar al principio del mensaje
+        body: JSON.stringify({ message: `[skip ci] 📸 Subida de imagen: ${uniqueName}`, content: cleanBase64, branch: settings.repoBranch })
+    });
 
     if (!response.ok) throw new Error("Error al subir la imagen a la nube");
     return `/images/noticias/${uniqueName}`;
