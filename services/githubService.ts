@@ -195,7 +195,12 @@ const mergeData = (localArts: Article[], remoteArts: Article[], localArch: Archi
     });
 
     return {
-        articles: mergedArts.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+        articles: mergedArts.sort((a, b) => {
+            const orderA = a.customOrder || 0;
+            const orderB = b.customOrder || 0;
+            if (orderA !== orderB) return orderB - orderA; // Ordena por prioridad (4, 3, 2, 1, 0)
+            return new Date(b.date).getTime() - new Date(a.date).getTime(); // Si tienen la misma, ordena por fecha
+        }),
         archive: mergedArch.sort((a, b) => new Date(b.archivedAt || 0).getTime() - new Date(a.archivedAt || 0).getTime())
     };
 };
