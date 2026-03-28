@@ -8,10 +8,10 @@ const INITIAL_AUTHORS: Author[] = [
   { id: '4', name: 'Rubén Sánchez', role: 'Redacción', imageUrl: '/images/ruben.jpg', systemRole: 'ADMIN' },
   { id: '5', name: 'Iris Rodríguez', role: 'Redacción', imageUrl: '/images/iris.jpg', systemRole: 'ADMIN' },
   { id: '6', name: 'Antonio Tortosa', role: 'Redacción', imageUrl: '/images/antonio.jpg', systemRole: 'ADMIN' },
-  { id: '7', name: 'Inés Sáez', role: 'Redacción', imageUrl: '/images/ines.jpg', systemRole: 'ADMIN' },
-  { id: '8', name: 'Enrique Salazar', role: 'Redacción', imageUrl: '/images/enrique.jpg', systemRole: 'ADMIN' },
-  { id: '9', name: 'Ruben Castillo', role: 'Redacción', imageUrl: '/images/rubencas.jpg', systemRole: 'ADMIN' },
-  { id: '10', name: 'Pepe Riofrio', role: 'Redacción', imageUrl: '/images/peperi.jpg', systemRole: 'ADMIN' },
+  { id: '7', name: 'Enrique Salazar', role: 'Redacción', imageUrl: '/images/enrique.jpg', systemRole: 'ADMIN' },
+  { id: '8', name: 'Ruben Castillo', role: 'Redacción', imageUrl: '/images/rubencas.jpg', systemRole: 'ADMIN' },
+  { id: '9', name: 'Pepe Riofrio', role: 'Redacción', imageUrl: '/images/peperi.jpg', systemRole: 'ADMIN' },
+  { id: '10', name: 'Adrián Mendez', role: 'Redacción', imageUrl: '/images/adrimen.jpg', systemRole: 'ADMIN' },
 ];
 
 export const INITIAL_ARTICLES: Article[] = [
