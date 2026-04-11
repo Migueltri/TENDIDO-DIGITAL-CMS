@@ -89,7 +89,8 @@ const ArticlesList: React.FC = () => {
           const updatedArticle = { ...article, isPublished: true };
           saveArticle(updatedArticle, true); 
           setIsSyncing(true);
-          syncWithGitHub(true).then(result => {
+          syncWithGitHub(true).then(async (result) => {
+              await new Promise(resolve => setTimeout(resolve, 2000));
               if (result.success) setPendingChanges(0);
               else {
                   alert("⚠️ Se guardó localmente, pero hubo un error subiendo a la web: " + result.message);
@@ -105,7 +106,8 @@ const ArticlesList: React.FC = () => {
           const updatedArticle = { ...article, isPublished: false };
           saveArticle(updatedArticle, true);
           setIsSyncing(true);
-          syncWithGitHub(true).then(result => {
+          syncWithGitHub(true).then(async (result) => {
+          await new Promise(resolve => setTimeout(resolve, 2000));
               if (result.success) setPendingChanges(0);
               else {
                   alert("⚠️ Retirada localmente, pero falló la sincronización: " + result.message);
@@ -136,7 +138,8 @@ const handleTogglePin = async (article: Article) => {
     const updatedArticle = { ...article, isPinned: !isCurrentlyPinned };
     saveArticle(updatedArticle, true);
     setIsSyncing(true);
-    syncWithGitHub(true).then(result => {
+    syncWithGitHub(true).then(async (result) => {
+      await new Promise(resolve => setTimeout(resolve, 2000));
       if (result.success) setPendingChanges(0);
       else {
         alert("⚠️ Se cambió localmente, pero falló la subida a la web: " + result.message);
@@ -302,7 +305,7 @@ const handleTogglePin = async (article: Article) => {
             {filteredList.length === 0 ? (
                 <div className="p-8 text-center text-gray-500">{viewMode === 'active' ? 'No se encontraron noticias activas.' : 'El historial está vacío.'}</div>
             ) : (
-                paginatedList.map((article) => {
+                (paginatedList || []).map((article) => {
                     const author = getAuthor(article.authorId);
                     const authorName = author ? author.name : 'Desconocido';
                     return (
